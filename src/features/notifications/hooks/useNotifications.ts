@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { NotificationsRepository } from '../repository/NotificationsRepository';
+import { DevicesRepository } from '../../devices/repository/DevicesRepository';
 
 export const useNotifications = () => {
   const router = useRouter();
@@ -35,16 +36,54 @@ export const useNotifications = () => {
     }
   };
 
-  const saveNotificationConfig = async (deviceId: string, config: any) => {
+  const [configLoading, setConfigLoading] = useState(false);
+
+  const loadNotificationConfig = useCallback(async (deviceId: string, userId: string) => {
+    setConfigLoading(true);
+    try {
+      const data = await NotificationsRepository.getNotificationsPerDevice(deviceId);
+      const userConfig = data.find((item: any) => String(item.guest_account_id) === String(userId));
+      return userConfig;
+    } catch (e) {
+      console.error('Error loading notification config:', e);
+      return null;
+    } finally {
+      setConfigLoading(false);
+    }
+  }, []);
+
+  const saveNotificationConfig = async (data: {
+    device_id: number;
+    extra_info: number;
+    guest_account_id: number;
+    notifications: string;
+  }) => {
     setIsSaving(true);
     try {
-      await NotificationsRepository.saveNotificationConfig(deviceId, config);
-    } catch (e) {
-      console.error('Error saving notification config:', e);
+      await NotificationsRepository.saveNotificationsData(data);
+      alert('Configuración de notificaciones guardada exitosamente.');
+    } catch (e: any) {
+      alert(e.message || 'Error al guardar la configuración de notificaciones.');
+      throw e;
     } finally {
       setIsSaving(false);
     }
   };
 
-  return { alarms, isLoading, isSaving, toggleAlarm, saveNotificationConfig, refetch: fetchAlarms };
+  const saveLocalAlarmData = async (deviceId: number, alarmIds: number[]) => {
+    setIsSaving(true);
+    try {
+      await NotificationsRepository.saveLocalAlarmData(deviceId, alarmIds);
+      // Refresh the devices list to update cache with new trigger configurations
+      await DevicesRepository.getDevices();
+      alert('Configuración de alarmas locales guardada exitosamente.');
+      router.back();
+    } catch (e: any) {
+      alert(e.message || 'Error al guardar la configuración de alarmas locales.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return { alarms, isLoading, isSaving, configLoading, toggleAlarm, loadNotificationConfig, saveNotificationConfig, saveLocalAlarmData, refetch: fetchAlarms };
 };

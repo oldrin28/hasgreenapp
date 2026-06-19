@@ -16,7 +16,7 @@ HASGREEN es un **sistema de alertas tempranas diseñado para adultos mayores**. 
 
 ## Project Directory Structure
 
-- **/assets**: Static assets like images and app icons.
+- **/assets**: Static assets like images, app icons, and notification sounds.
 - **/scripts**: Helper and utility scripts for the project.
 - **/src/app**: Expo Router navigation. Contains all screens, layouts (`_layout.tsx`), y el árbol de navegación.
   - **/src/app/(auth)**: Rutas del flujo de autenticación (Login, Signup).
@@ -28,11 +28,11 @@ HASGREEN es un **sistema de alertas tempranas diseñado para adultos mayores**. 
   - **/src/features/dashboard**: Pantalla principal (`DashboardScreen`, `useDashboard`, `DashboardRepository`).
   - **/src/features/patients**: Gestión de pacientes (`PatientsListScreen`, `CreatePatientScreen`, `EditPatientScreen`, `usePatients`, `PatientsRepository`).
   - **/src/features/devices**: Gestión de dispositivos (`DevicesListScreen`, `CreateDeviceScreen`, `EditDeviceScreen`, `ScanQRScreen`, `useDevices`, `DevicesRepository`).
-  - **/src/features/gateways**: Gestión de gateways (`GatewaysListScreen`, `CreateGatewayScreen`, `EditGatewayScreen`, `useGateways`, `GatewaysRepository`).
+  - **/src/features/gateways**: Gestión de gateways (`GatewaysListScreen`, `CreateGatewayScreen`, `EditGatewayScreen`, `ConnectGatewayScreen`, `useGateways`, `GatewaysRepository`).
   - **/src/features/users**: Gestión de usuarios (`UsersListScreen`, `CreateUserScreen`, `EditUserScreen`, `useUsers`, `UsersRepository`).
   - **/src/features/profile**: Perfil y cuenta del usuario autenticado (`ProfileScreen`, `EditAccountScreen`, `ChangePasswordScreen`, `useProfile`, `ProfileRepository`).
   - **/src/features/notifications**: Configuración de notificaciones y alarmas (`NotificationsMenuScreen`, `ConfigNotificationsStep1Screen`, `ConfigNotificationsStep2Screen`, `ConfigNotificationsStep3Screen`, `ConfigureAlarmScreen`, `AlarmManagementScreen`, `useNotifications`, `NotificationsRepository`).
-- **/src/hooks**: Custom React hooks globales utilizados en la aplicación.
+- **/src/hooks**: Custom React hooks globales utilizados en la aplicación (ej., `usePushNotifications.ts`).
 
 ## Reglas de Diseño Globales (¡CRÍTICO!)
 
@@ -41,6 +41,8 @@ Para **TODO LO QUE SE HAGA EN LA APP**, se deben cumplir estrictamente las sigui
 2. **TEMAS DINÁMICOS**: Se debe respetar el sistema de modo Oscuro y Claro. Extrae siempre los colores del objeto global `Colors[theme]` de `theme.ts` y nunca uses colores harcodeados (ej., `color: '#FFF'`).
 3. **SIN BORDES**: El diseño general ("High-End") prohíbe el uso de líneas o bordes sólidos de 1px. Para separar los elementos visualmente, emplea la elevación ("ambient lift") usando los componentes `Card` con sus capas (`surfaceContainerLowest`, `surfaceContainerLow`) y los márgenes (`Spacing`).
 4. **MANEJO DE ERRORES Y VALIDACIONES**: Todos los errores de red, fallos de lógica y validaciones de formularios deben manejarse de forma controlada mediante bloques `try-catch`, excepciones explícitas y mensajes informativos claros para el usuario (por ejemplo, indicando datos faltantes o incorrectos) de tal manera que la aplicación nunca se detenga o quede congelada (pantallas blancas o crashes). Además, al consumir un endpoint, siempre se debe validar la respuesta; si es exitosa en los casos de actualizar, crear o eliminar, se debe mostrar un mensaje de confirmación, y si no es exitosa, se debe lanzar una excepción explícita para que sea capturada y mostrada al usuario con el mensaje de error.
+5. **LOGS DE ENDPOINTS (¡CRÍTICO!)**: Cada vez que se configure o consuma un endpoint, se debe colocar un log que indique si la acción se realizó con éxito o marcó error según el resultado del consumo, especificando la acción realizada, seguido de la fecha y hora de la petición (ej. `new Date().toISOString()`).
+6. **PREVENCIÓN DE BUCLES INFINITOS (¡CRÍTICO!)**: Sé extremadamente cuidadoso al utilizar efectos (`useEffect`, `useFocusEffect`) que realicen peticiones de red o actualicen estados. Asegúrate de que las dependencias de estos efectos sean estables. Evita colocar funciones inestables en los arrays de dependencias (por ejemplo, funciones retornadas por hooks de React que no estén envueltas en `useCallback`), ya que esto provocará bucles infinitos de renderizado y peticiones HTTP recurrentes, saturando el servidor y generando bloqueos de tipo Rate Limit (HTTP 429). Preferiblemente usa dependencias vacías (`[]`) para llamadas únicas de inicio o de enfoque.
 
 ## Patrones de Desarrollo y Arquitectura
 

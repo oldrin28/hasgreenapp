@@ -1,7 +1,7 @@
-import React from 'react';
-import { StyleSheet, View, ScrollView, useColorScheme, Pressable, TextInput } from 'react-native';
+import React, { useCallback } from 'react';
+import { StyleSheet, View, ScrollView, useColorScheme, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
 import { Card } from '@/components/ui/Card';
 import { Spacing, Colors, Rounded } from '@/constants/theme';
@@ -12,25 +12,40 @@ export const UsersListScreen = () => {
   const router = useRouter();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
-  const { users } = useUsers();
+  const { users, refetch, isLoading } = useUsers();
 
-  const roleColors: Record<string, string> = {
-    'Administrador': activeColors.secondaryContainer,
-    'Operador': activeColors.surfaceContainerHighest,
-    'Soporte Técnico': activeColors.secondaryContainer,
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
+  const getStatusLabel = (status: number) => {
+    return status === 1 ? 'Confirmado' : 'Pendiente';
   };
 
-  const roleTextColors: Record<string, string> = {
-    'Administrador': activeColors.onSecondaryContainer,
-    'Operador': activeColors.onSurfaceVariant,
-    'Soporte Técnico': activeColors.onSecondaryContainer,
+  const statusColors: Record<string, string> = {
+    'Confirmado': activeColors.primaryContainer,
+    'Pendiente': activeColors.surfaceContainerHighest,
+  };
+
+  const statusTextColors: Record<string, string> = {
+    'Confirmado': activeColors.onPrimaryContainer,
+    'Pendiente': activeColors.onSurfaceVariant,
   };
 
   const pillColors: Record<string, string> = {
-    'Administrador': activeColors.primary,
-    'Operador': activeColors.tertiary,
-    'Soporte Técnico': activeColors.primary,
+    'Confirmado': activeColors.primary,
+    'Pendiente': activeColors.outline,
   };
+
+  if (isLoading && users.length === 0) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: activeColors.background }]}>
+        <ActivityIndicator size="large" color={activeColors.primary} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -73,47 +88,61 @@ export const UsersListScreen = () => {
 
         {/* User Cards */}
         <View style={styles.gridContainer}>
-          {users.map((user) => (
-            <Card key={user.id} layer="lowest" style={styles.userCard}>
-              <View style={[styles.activePill, { backgroundColor: pillColors[user.role] ?? activeColors.primary }]} />
+          {users.map((user) => {
+            const statusLabel = getStatusLabel(user.guest_status);
+            const userName = `${user.guest_first_name || ''} ${user.guest_last_name || ''}`.trim() || 'Usuario sin nombre';
+            return (
+              <Card key={user.guest_account_id || user.guest_email_address} layer="lowest" style={styles.userCard}>
+                <View style={[styles.activePill, { backgroundColor: pillColors[statusLabel] ?? activeColors.primary }]} />
 
-              <View style={styles.cardHeader}>
-                <View style={[styles.userIcon, { backgroundColor: 'rgba(8, 107, 0, 0.1)' }]}>
-                  <MaterialIcons name="person" size={28} color={activeColors.primary} />
+                <View style={styles.cardHeader}>
+                  <View style={[styles.userIcon, { backgroundColor: 'rgba(8, 107, 0, 0.1)' }]}>
+                    <MaterialIcons name="person" size={28} color={activeColors.primary} />
+                  </View>
+                  <Pressable style={styles.moreBtn}>
+                    <MaterialIcons name="more-vert" size={24} color={activeColors.outline} />
+                  </Pressable>
                 </View>
-                <Pressable style={styles.moreBtn}>
-                  <MaterialIcons name="more-vert" size={24} color={activeColors.outline} />
-                </Pressable>
-              </View>
 
-              <View style={{ marginBottom: Spacing[6] }}>
-                <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700' }}>{user.name}</Typography>
-                <View style={{ alignSelf: 'flex-start', marginTop: Spacing[2] }}>
-                  <View style={[styles.roleBadge, { backgroundColor: roleColors[user.role] ?? activeColors.surfaceContainerHighest }]}>
-                    <Typography variant="label" style={{ color: roleTextColors[user.role] ?? activeColors.onSurfaceVariant, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>{user.role}</Typography>
+                <View style={{ marginBottom: Spacing[6] }}>
+                  <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700' }}>{userName}</Typography>
+                  <View style={{ alignSelf: 'flex-start', marginTop: Spacing[2] }}>
+                    <View style={[styles.roleBadge, { backgroundColor: statusColors[statusLabel] ?? activeColors.surfaceContainerHighest }]}>
+                      <Typography variant="label" style={{ color: statusTextColors[statusLabel] ?? activeColors.onSurfaceVariant, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>{statusLabel}</Typography>
+                    </View>
                   </View>
                 </View>
-              </View>
 
-              <View style={styles.contactInfo}>
-                <View style={styles.contactRow}>
-                  <MaterialIcons name="mail" size={16} color={activeColors.onSurfaceVariant} />
-                  <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>{user.email}</Typography>
+                <View style={styles.contactInfo}>
+                  <View style={styles.contactRow}>
+                    <MaterialIcons name="mail" size={16} color={activeColors.onSurfaceVariant} />
+                    <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>{user.guest_email_address || 'Sin correo'}</Typography>
+                  </View>
+                  {user.guest_creation_timestamp && (
+                    <View style={styles.contactRow}>
+                      <MaterialIcons name="date-range" size={16} color={activeColors.onSurfaceVariant} />
+                      <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>
+                        Creado: {new Date(user.guest_creation_timestamp * 1000).toLocaleDateString()}
+                      </Typography>
+                    </View>
+                  )}
+                  <View style={styles.contactRow}>
+                    <MaterialIcons name={user.guest_extra_info === 1 ? "check-circle" : "cancel"} size={16} color={user.guest_extra_info === 1 ? activeColors.primary : activeColors.outline} />
+                    <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>
+                      Info extra paciente: {user.guest_extra_info === 1 ? 'Habilitado' : 'Deshabilitado'}
+                    </Typography>
+                  </View>
                 </View>
-                <View style={styles.contactRow}>
-                  <MaterialIcons name="phone-iphone" size={16} color={activeColors.onSurfaceVariant} />
-                  <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>{user.phone}</Typography>
-                </View>
-              </View>
 
-              <View style={[styles.cardFooter, { borderTopColor: 'rgba(171, 173, 174, 0.15)' }]}>
-                <Pressable style={styles.editBtn} onPress={() => router.push('/editar-usuario' as any)}>
-                  <Typography variant="label" style={{ color: activeColors.primary, fontWeight: '700' }}>Editar Perfil</Typography>
-                  <MaterialIcons name="arrow-forward" size={16} color={activeColors.primary} />
-                </Pressable>
-              </View>
-            </Card>
-          ))}
+                <View style={[styles.cardFooter, { borderTopColor: 'rgba(171, 173, 174, 0.15)' }]}>
+                  <Pressable style={styles.editBtn} onPress={() => router.push({ pathname: '/editar-usuario', params: { id: user.guest_account_id } } as any)}>
+                    <Typography variant="label" style={{ color: activeColors.primary, fontWeight: '700' }}>Editar Perfil</Typography>
+                    <MaterialIcons name="arrow-forward" size={16} color={activeColors.primary} />
+                  </Pressable>
+                </View>
+              </Card>
+            );
+          })}
 
           {/* Add New User Placeholder */}
           <Pressable

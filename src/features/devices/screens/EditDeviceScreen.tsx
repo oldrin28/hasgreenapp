@@ -11,12 +11,14 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useDevices } from '../hooks/useDevices';
 import { usePatients } from '../../patients/hooks/usePatients';
 
+import { DEVICE_TYPES } from './DevicesListScreen';
+
 export function EditDeviceScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
-  const { loadDevice, device, updateDevice, deleteDevice, isLoading } = useDevices();
+  const { loadDevice, device, updateDevice, deleteDevice, loadDeviceTypes, deviceTypes, loadDevices, devices, isLoading } = useDevices();
   const { loadPatients, patients } = usePatients();
 
   // Estados locales para los campos editables
@@ -30,6 +32,8 @@ export function EditDeviceScreen() {
 
   useEffect(() => {
     loadPatients();
+    loadDeviceTypes();
+    loadDevices();
     if (id) {
       loadDevice(id).then(data => {
         if (data) {
@@ -65,8 +69,40 @@ export function EditDeviceScreen() {
       </View>
     );
   }
-
   const isDeviceActive = device?.device_status === 1 || device?.device_status === '1';
+  const devType = device?.device_type || device?.device_type_id || '';
+  
+  const dynamicType = deviceTypes.find((t: any) => 
+    (t.device_type_code && String(t.device_type_code) === String(devType)) ||
+    (t.code && String(t.code) === String(devType)) ||
+    (t.id && String(t.id) === String(device?.device_type_id)) ||
+    (t.id && String(t.id) === String(device?.device_type)) ||
+    (t.device_type_id && String(t.device_type_id) === String(device?.device_type_id)) ||
+    (t.device_type_id && String(t.device_type_id) === String(device?.device_type))
+  );
+
+  const typeInfo = {
+    label: dynamicType?.device_type_name || dynamicType?.name || dynamicType?.label || DEVICE_TYPES[devType]?.label || devType || 'Dispositivo IoT'
+  };
+
+  const deviceFromList = devices.find((d: any) => 
+    (device?.device_unique_id && String(d.device_unique_id) === String(device.device_unique_id)) ||
+    (d.id && String(d.id) === String(id)) || 
+    (d.device_id && String(d.device_id) === String(id)) ||
+    (d.device_unique_id && String(d.device_unique_id) === String(id))
+  );
+
+  const displayLabel = 
+    deviceFromList?.device_description || 
+    device?.device_description || 
+    dynamicType?.device_type_name || 
+    dynamicType?.device_description || 
+    dynamicType?.device_type_description || 
+    dynamicType?.name || 
+    dynamicType?.label || 
+    DEVICE_TYPES[devType]?.label || 
+    devType || 
+    'Dispositivo IoT';
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -93,7 +129,7 @@ export function EditDeviceScreen() {
           </View>
         </View>
       </View>
-
+ 
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -105,16 +141,16 @@ export function EditDeviceScreen() {
             <View style={[styles.glowBlob, { backgroundColor: 'rgba(104, 254, 79, 0.2)' }]} />
             <View style={{ position: 'relative', zIndex: 1 }}>
               <Typography variant="label" style={{ color: activeColors.primary, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: Spacing[2] }}>
-                Identificador del Hardware
+                Tipo de Dispositivo
               </Typography>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing[3], flexWrap: 'wrap' }}>
-                <Typography variant="headline" style={{ fontSize: 32, fontWeight: '800', letterSpacing: -1 }}>
-                  UID {device?.device_unique_id || 'N/A'}
+                <Typography variant="headline" style={{ fontSize: 28, fontWeight: '800', letterSpacing: -0.5 }}>
+                  {displayLabel}
                 </Typography>
-                {device?.device_type && (
+                {device?.device_unique_id && (
                   <View style={[styles.typeBadge, { backgroundColor: activeColors.surfaceContainerHigh }]}>
                     <Typography variant="label" color="onSurfaceVariant" style={{ fontSize: 11, fontWeight: '700' }}>
-                      {device.device_type}
+                      UID: {device.device_unique_id}
                     </Typography>
                   </View>
                 )}

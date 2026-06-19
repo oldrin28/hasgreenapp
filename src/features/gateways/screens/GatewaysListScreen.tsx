@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { StyleSheet, View, ScrollView, useColorScheme, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
 import { Card } from '@/components/ui/Card';
 import { Spacing, Colors, Rounded } from '@/constants/theme';
@@ -13,13 +13,15 @@ export function GatewaysListScreen() {
   const router = useRouter();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
-  const { loadGateways, isLoading } = useGateways();
+  const { loadGateways, gateways, rebootGateway, isLoading } = useGateways();
 
-  useEffect(() => {
-    loadGateways();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadGateways();
+    }, [])
+  );
 
-  if (isLoading) {
+  if (isLoading && gateways.length === 0) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: activeColors.background }]}>
         <ActivityIndicator size="large" color={activeColors.primary} />
@@ -58,163 +60,159 @@ export function GatewaysListScreen() {
 
         {/* Bento Grid Layout for Gateways */}
         <View style={styles.gridContainer}>
-          
-          {/* Gateway Card 1 */}
-          <Card layer="lowest" style={styles.gatewayCard}>
-            <LinearGradient colors={[activeColors.primary, activeColors.primaryDim]} style={styles.activePill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+          {gateways.map((gateway: any) => {
+            const isOnline = gateway.gateway_last_activity_timestamp && 
+              (Date.now() / 1000 - gateway.gateway_last_activity_timestamp < 900); // 15 minutes
             
-            <View style={styles.cardHeader}>
-              <View>
-                <Typography variant="headline" style={{ fontSize: 20 }}>GW-Principal-HQ</Typography>
-                <Typography variant="label" color="outline" style={{ fontFamily: 'monospace', fontSize: 12, marginTop: Spacing[1], textTransform: 'uppercase', letterSpacing: 1 }}>UID: 4F:A2:C8:99:11:0B</Typography>
-              </View>
-              <View style={[styles.activeBadge, { backgroundColor: activeColors.primaryContainer, borderColor: activeColors.primary }]}>
-                <View style={[styles.dot, { backgroundColor: activeColors.primary }]} />
-                <Typography variant="label" style={{ color: activeColors.primary, fontSize: 10, fontWeight: '700', letterSpacing: 1 }}>ACTIVO</Typography>
-              </View>
-            </View>
+            return (
+              <Card key={gateway.id || gateway.gateway_unique_id} layer="lowest" style={styles.gatewayCard}>
+                <LinearGradient 
+                  colors={isOnline ? [activeColors.primary, activeColors.primaryDim] : [activeColors.outlineVariant, activeColors.outline]} 
+                  style={styles.activePill} 
+                  start={{ x: 0, y: 0 }} 
+                  end={{ x: 1, y: 1 }} 
+                />
+                
+                <View style={styles.cardHeader}>
+                  <View>
+                    <Typography variant="headline" style={{ fontSize: 20 }}>{gateway.gateway_name || 'Sin Nombre'}</Typography>
+                    <Typography variant="label" color="outline" style={{ fontFamily: 'monospace', fontSize: 12, marginTop: Spacing[1], textTransform: 'uppercase', letterSpacing: 1 }}>
+                      UID: {gateway.gateway_unique_id || 'N/A'}
+                    </Typography>
+                  </View>
+                  <View style={[
+                    styles.activeBadge, 
+                    { 
+                      backgroundColor: isOnline ? activeColors.primaryContainer : activeColors.surfaceContainerHigh, 
+                      borderColor: isOnline ? activeColors.primary : activeColors.outline 
+                    }
+                  ]}>
+                    <View style={[styles.dot, { backgroundColor: isOnline ? activeColors.primary : activeColors.outline }]} />
+                    <Typography variant="label" style={{ color: isOnline ? activeColors.primary : activeColors.onSurfaceVariant, fontSize: 10, fontWeight: '700', letterSpacing: 1 }}>
+                      {isOnline ? 'ACTIVO' : 'INACTIVO'}
+                    </Typography>
+                  </View>
+                </View>
 
-            <View style={styles.infoGroup}>
-              <View style={styles.infoRow}>
-                <View style={[styles.iconBox, { backgroundColor: activeColors.surfaceContainer }]}>
-                  <MaterialIcons name="wifi" size={16} color={activeColors.onSurfaceVariant} />
+                <View style={styles.infoGroup}>
+                  <View style={styles.infoRow}>
+                    <View style={[styles.iconBox, { backgroundColor: activeColors.surfaceContainer }]}>
+                      <MaterialIcons name="wifi" size={16} color={activeColors.onSurfaceVariant} />
+                    </View>
+                    <View>
+                      <Typography variant="label" color="outline" style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase' }}>Red Conectada</Typography>
+                      <Typography variant="body" style={{ fontSize: 14, fontWeight: '500' }}>{gateway.gateway_connected_to || 'Desconectado'}</Typography>
+                    </View>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <View style={[styles.iconBox, { backgroundColor: activeColors.surfaceContainer }]}>
+                      <MaterialIcons name="lan" size={16} color={activeColors.onSurfaceVariant} />
+                    </View>
+                    <View>
+                      <Typography variant="label" color="outline" style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase' }}>Dirección IP</Typography>
+                      <Typography variant="body" style={{ fontSize: 14, fontWeight: '500' }}>{gateway.gateway_ip_address || '0.0.0.0'}</Typography>
+                    </View>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <View style={[styles.iconBox, { backgroundColor: activeColors.surfaceContainer }]}>
+                      <MaterialIcons name="update" size={16} color={activeColors.onSurfaceVariant} />
+                    </View>
+                    <View>
+                      <Typography variant="label" color="outline" style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase' }}>Firmware</Typography>
+                      <Typography variant="body" style={{ fontSize: 14, fontWeight: '500' }}>{gateway.gateway_firmware_version || 'N/A'}</Typography>
+                    </View>
+                  </View>
                 </View>
-                <View>
-                  <Typography variant="label" color="outline" style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase' }}>Red Conectada</Typography>
-                  <Typography variant="body" style={{ fontSize: 14, fontWeight: '500' }}>Corp_Main_5G</Typography>
-                </View>
-              </View>
-              <View style={styles.infoRow}>
-                <View style={[styles.iconBox, { backgroundColor: activeColors.surfaceContainer }]}>
-                  <MaterialIcons name="lan" size={16} color={activeColors.onSurfaceVariant} />
-                </View>
-                <View>
-                  <Typography variant="label" color="outline" style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase' }}>Dirección IP</Typography>
-                  <Typography variant="body" style={{ fontSize: 14, fontWeight: '500' }}>192.168.1.105</Typography>
-                </View>
-              </View>
-              <View style={styles.infoRow}>
-                <View style={[styles.iconBox, { backgroundColor: activeColors.surfaceContainer }]}>
-                  <MaterialIcons name="update" size={16} color={activeColors.onSurfaceVariant} />
-                </View>
-                <View>
-                  <Typography variant="label" color="outline" style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase' }}>Firmware</Typography>
-                  <Typography variant="body" style={{ fontSize: 14, fontWeight: '500' }}>v2.4.1-stable</Typography>
-                </View>
-              </View>
-            </View>
 
-            <Pressable style={[styles.manageBtn, { backgroundColor: activeColors.surfaceContainerHigh }]} onPress={() => router.push('/editar-gateway' as any)}>
-              <Typography variant="label" style={{ color: activeColors.primary, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' }}>Gestionar Nodo</Typography>
-            </Pressable>
-          </Card>
+                {/* Action Buttons Layout */}
+                {(() => {
+                  const ip = gateway.gateway_ip_address;
+                  const isNoneOrEmpty = !ip || 
+                                       ip.trim() === '' || 
+                                       ip.trim().toLowerCase() === 'none';
+                  const hasIp = !isNoneOrEmpty;
 
-          {/* Gateway Card 2 */}
-          <Card layer="lowest" style={styles.gatewayCard}>
-            <LinearGradient colors={[activeColors.primary, activeColors.primaryDim]} style={styles.activePill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
-            
-            <View style={styles.cardHeader}>
-              <View>
-                <Typography variant="headline" style={{ fontSize: 20 }}>GW-Almacen-Norte</Typography>
-                <Typography variant="label" color="outline" style={{ fontFamily: 'monospace', fontSize: 12, marginTop: Spacing[1], textTransform: 'uppercase', letterSpacing: 1 }}>UID: 22:B1:C5:D3:E4:F5</Typography>
-              </View>
-              <View style={[styles.activeBadge, { backgroundColor: activeColors.primaryContainer, borderColor: activeColors.primary }]}>
-                <View style={[styles.dot, { backgroundColor: activeColors.primary }]} />
-                <Typography variant="label" style={{ color: activeColors.primary, fontSize: 10, fontWeight: '700', letterSpacing: 1 }}>ACTIVO</Typography>
-              </View>
-            </View>
+                  if (!hasIp) {
+                    return (
+                      <View style={{ gap: Spacing[3], marginTop: Spacing[6] }}>
+                        {/* Conectar Gateway Button (Full-width Primary) */}
+                        <Pressable 
+                          style={[styles.actionBtnPrimary, { backgroundColor: activeColors.primary, marginTop: 0 }]} 
+                          onPress={() => router.push({ 
+                            pathname: '/conectar-gateway', 
+                            params: { 
+                              id: gateway.id, 
+                              uid: gateway.gateway_unique_id, 
+                              name: gateway.gateway_name 
+                            } 
+                          } as any)}
+                        >
+                          <MaterialIcons name="link" size={16} color={activeColors.onPrimary} />
+                          <Typography variant="label" style={{ color: activeColors.onPrimary, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' }}>
+                            Conectar Gateway
+                          </Typography>
+                        </Pressable>
 
-            <View style={styles.infoGroup}>
-              <View style={styles.infoRow}>
-                <View style={[styles.iconBox, { backgroundColor: activeColors.surfaceContainer }]}>
-                  <MaterialIcons name="wifi" size={16} color={activeColors.onSurfaceVariant} />
-                </View>
-                <View>
-                  <Typography variant="label" color="outline" style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase' }}>Red Conectada</Typography>
-                  <Typography variant="body" style={{ fontSize: 14, fontWeight: '500' }}>Warehouse_Guest</Typography>
-                </View>
-              </View>
-              <View style={styles.infoRow}>
-                <View style={[styles.iconBox, { backgroundColor: activeColors.surfaceContainer }]}>
-                  <MaterialIcons name="lan" size={16} color={activeColors.onSurfaceVariant} />
-                </View>
-                <View>
-                  <Typography variant="label" color="outline" style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase' }}>Dirección IP</Typography>
-                  <Typography variant="body" style={{ fontSize: 14, fontWeight: '500' }}>10.0.0.42</Typography>
-                </View>
-              </View>
-              <View style={styles.infoRow}>
-                <View style={[styles.iconBox, { backgroundColor: activeColors.surfaceContainer }]}>
-                  <MaterialIcons name="update" size={16} color={activeColors.onSurfaceVariant} />
-                </View>
-                <View>
-                  <Typography variant="label" color="outline" style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase' }}>Firmware</Typography>
-                  <Typography variant="body" style={{ fontSize: 14, fontWeight: '500' }}>v2.3.9-LTS</Typography>
-                </View>
-              </View>
-            </View>
+                        {/* Editar Button (Full-width Secondary) */}
+                        <Pressable 
+                          style={[styles.actionBtnPrimary, { backgroundColor: activeColors.surfaceContainerHigh, marginTop: 0 }]} 
+                          onPress={() => router.push({ pathname: '/editar-gateway', params: { id: gateway.id } } as any)}
+                        >
+                          <MaterialIcons name="edit" size={16} color={activeColors.primary} />
+                          <Typography variant="label" style={{ color: activeColors.primary, fontSize: 12, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                            Editar
+                          </Typography>
+                        </Pressable>
+                      </View>
+                    );
+                  } else {
+                    return (
+                      <View style={[styles.secondaryActionsRow, { marginTop: Spacing[6] }]}>
+                        {/* Editar Button (Left Half) */}
+                        <Pressable 
+                          style={[styles.actionBtnSecondary, { backgroundColor: activeColors.surfaceContainerHigh }]} 
+                          onPress={() => router.push({ pathname: '/editar-gateway', params: { id: gateway.id } } as any)}
+                        >
+                          <MaterialIcons name="edit" size={16} color={activeColors.primary} />
+                          <Typography variant="label" style={{ color: activeColors.primary, fontSize: 12, fontWeight: '700', letterSpacing: 0.5 }}>
+                            Editar
+                          </Typography>
+                        </Pressable>
 
-            <Pressable style={[styles.manageBtn, { backgroundColor: activeColors.surfaceContainerHigh }]} onPress={() => router.push('/editar-gateway' as any)}>
-              <Typography variant="label" style={{ color: activeColors.primary, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' }}>Gestionar Nodo</Typography>
-            </Pressable>
-          </Card>
+                        {/* Reiniciar Button (Right Half) */}
+                        <Pressable 
+                          style={[styles.actionBtnSecondary, { backgroundColor: activeColors.surfaceContainerHigh }]} 
+                          onPress={() => rebootGateway(gateway.gateway_ip_address)}
+                          disabled={isLoading}
+                        >
+                          <MaterialIcons name="restart-alt" size={16} color={activeColors.error} />
+                          <Typography variant="label" style={{ color: activeColors.error, fontSize: 12, fontWeight: '700', letterSpacing: 0.5 }}>
+                            Reiniciar
+                          </Typography>
+                        </Pressable>
+                      </View>
+                    );
+                  }
+                })()}
+              </Card>
+            );
+          })}
 
-          {/* Gateway Card 3 */}
-          <Card layer="lowest" style={[styles.gatewayCard, { borderColor: activeColors.outlineVariant, borderWidth: 1 }]}>
-            <LinearGradient colors={[activeColors.primary, activeColors.primaryDim]} style={styles.activePill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
-            
-            <View style={styles.cardHeader}>
-              <View>
-                <Typography variant="headline" style={{ fontSize: 20 }}>GW-Laboratorio-C</Typography>
-                <Typography variant="label" color="outline" style={{ fontFamily: 'monospace', fontSize: 12, marginTop: Spacing[1], textTransform: 'uppercase', letterSpacing: 1 }}>UID: AB:00:11:22:33:44</Typography>
-              </View>
-              <View style={[styles.activeBadge, { backgroundColor: activeColors.primaryContainer, borderColor: activeColors.primary }]}>
-                <View style={[styles.dot, { backgroundColor: activeColors.primary }]} />
-                <Typography variant="label" style={{ color: activeColors.primary, fontSize: 10, fontWeight: '700', letterSpacing: 1 }}>ACTIVO</Typography>
-              </View>
-            </View>
-
-            <View style={styles.infoGroup}>
-              <View style={styles.infoRow}>
-                <View style={[styles.iconBox, { backgroundColor: activeColors.surfaceContainer }]}>
-                  <MaterialIcons name="settings-input-antenna" size={16} color={activeColors.onSurfaceVariant} />
-                </View>
-                <View>
-                  <Typography variant="label" color="outline" style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase' }}>Red Conectada</Typography>
-                  <Typography variant="body" style={{ fontSize: 14, fontWeight: '500' }}>Lab_Private_Mesh</Typography>
-                </View>
-              </View>
-              <View style={styles.infoRow}>
-                <View style={[styles.iconBox, { backgroundColor: activeColors.surfaceContainer }]}>
-                  <MaterialIcons name="lan" size={16} color={activeColors.onSurfaceVariant} />
-                </View>
-                <View>
-                  <Typography variant="label" color="outline" style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase' }}>Dirección IP</Typography>
-                  <Typography variant="body" style={{ fontSize: 14, fontWeight: '500' }}>172.16.2.14</Typography>
-                </View>
-              </View>
-              <View style={styles.infoRow}>
-                <View style={[styles.iconBox, { backgroundColor: activeColors.surfaceContainer }]}>
-                  <MaterialIcons name="update" size={16} color={activeColors.onSurfaceVariant} />
-                </View>
-                <View>
-                  <Typography variant="label" color="outline" style={{ fontSize: 10, fontWeight: '600', textTransform: 'uppercase' }}>Firmware</Typography>
-                  <Typography variant="body" style={{ fontSize: 14, fontWeight: '500' }}>v2.4.5-beta</Typography>
-                </View>
-              </View>
-            </View>
-
-            <Pressable style={[styles.manageBtn, { backgroundColor: activeColors.surfaceContainerHigh }]} onPress={() => router.push('/editar-gateway' as any)}>
-              <Typography variant="label" style={{ color: activeColors.primary, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' }}>Gestionar Nodo</Typography>
-            </Pressable>
-          </Card>
-
+          {gateways.length === 0 && (
+            <Card layer="lowest" style={{ padding: Spacing[6], alignItems: 'center' }}>
+              <MaterialIcons name="sensors" size={48} color={activeColors.primary} style={{ marginBottom: Spacing[4] }} />
+              <Typography variant="headline" style={{ fontSize: 18, marginBottom: Spacing[2] }}>Sin Gateways registrados</Typography>
+              <Typography variant="body" color="onSurfaceVariant" style={{ textAlign: 'center' }}>
+                No hay gateways registrados en el sistema para esta cuenta.
+              </Typography>
+            </Card>
+          )}
         </View>
 
       </ScrollView>
 
       {/* FAB */}
-      <Pressable style={styles.fab} onPress={() => router.push('/registrar-gateway' as any)}>
+      <Pressable style={styles.fab} onPress={() => router.push({ pathname: '/escanear-qr', params: { mode: 'gateway' } } as any)}>
         <LinearGradient colors={[activeColors.primary, activeColors.primaryDim]} style={styles.fabGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <MaterialIcons name="add" size={32} color={activeColors.onPrimary} />
         </LinearGradient>
@@ -291,13 +289,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  manageBtn: {
+  actionBtnPrimary: {
     marginTop: Spacing[6],
     width: '100%',
     paddingVertical: Spacing[3],
     borderRadius: Rounded.lg,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: Spacing[2],
+  },
+  secondaryActionsRow: {
+    flexDirection: 'row',
+    gap: Spacing[3],
+    marginTop: Spacing[3],
+    width: '100%',
+  },
+  actionBtnSecondary: {
+    flex: 1,
+    paddingVertical: Spacing[3],
+    borderRadius: Rounded.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing[2],
   },
   fab: {
     position: 'absolute',

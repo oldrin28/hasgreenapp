@@ -1,20 +1,138 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, useColorScheme, Pressable, KeyboardAvoidingView, Platform, Switch } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, ScrollView, useColorScheme, Pressable, KeyboardAvoidingView, Platform, Switch, ActivityIndicator, Modal, FlatList, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
 import { TextField } from '@/components/ui/TextField';
-import { Spacing, Colors, Rounded } from '@/constants/theme';
+import { Spacing, Colors, Rounded, Fonts } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useProfile } from '../hooks/useProfile';
+import { Country, State, City } from 'country-state-city';
 
 export const EditAccountScreen = () => {
   const router = useRouter();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
-  const { updateProfile, isSaving } = useProfile();
+  const { profile, updateProfile, isSaving, isLoading, fetchProfile } = useProfile();
 
   const [alertsEnabled, setAlertsEnabled] = useState(true);
+
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phone, setPhone] = useState('');
+  const [fixedPhone, setFixedPhone] = useState('');
+  const [country, setCountry] = useState('');
+  const [stateName, setStateName] = useState('');
+  const [city, setCity] = useState('');
+  const [address, setAddress] = useState('');
+
+  // Listados oficiales
+  const [countriesList, setCountriesList] = useState<any[]>([]);
+  const [statesList, setStatesList] = useState<any[]>([]);
+  const [citiesList, setCitiesList] = useState<any[]>([]);
+
+  // Búsqueda
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Modales
+  const [countryModal, setCountryModal] = useState(false);
+  const [stateModal, setStateModal] = useState(false);
+  const [cityModal, setCityModal] = useState(false);
+
+  // Inicializar países
+  useEffect(() => {
+    setCountriesList(Country.getAllCountries());
+  }, []);
+
+  // Cargar estados cuando cambie el país
+  useEffect(() => {
+    if (country) {
+      const matchedCountry = Country.getAllCountries().find(c => c.name === country);
+      if (matchedCountry) {
+        setStatesList(State.getStatesOfCountry(matchedCountry.isoCode));
+      } else {
+        setStatesList([]);
+      }
+    } else {
+      setStatesList([]);
+    }
+  }, [country]);
+
+  // Cargar ciudades cuando cambie el estado
+  useEffect(() => {
+    if (stateName && country) {
+      const matchedCountry = Country.getAllCountries().find(c => c.name === country);
+      if (matchedCountry) {
+        const matchedState = State.getStatesOfCountry(matchedCountry.isoCode).find(s => s.name === stateName);
+        if (matchedState) {
+          setCitiesList(City.getCitiesOfState(matchedCountry.isoCode, matchedState.isoCode));
+        } else {
+          setCitiesList([]);
+        }
+      } else {
+        setCitiesList([]);
+      }
+    } else {
+      setCitiesList([]);
+    }
+  }, [stateName, country]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  useEffect(() => {
+    if (profile) {
+      setFirstName(profile.first_name || '');
+      setLastName(profile.last_name || '');
+      setEmail(profile.email_address || '');
+      setPhoneCode(profile.mobile_phone_country_code || profile.fixed_phone_country_code || '');
+      setPhone(profile.mobile_phone_number || '');
+      setFixedPhone(profile.fixed_phone_number || '');
+      setCountry(profile.country || '');
+      setStateName(profile.state || '');
+      setCity(profile.city || '');
+      setAddress(profile.address1 || '');
+    }
+  }, [profile]);
+
+  const handleUpdate = async () => {
+    try {
+      await updateProfile({
+        first_name: firstName,
+        last_name: lastName,
+        email_address: email,
+        mobile_phone_country_code: phoneCode,
+        mobile_phone_number: phone,
+        fixed_phone_country_code: phoneCode,
+        fixed_phone_number: fixedPhone,
+        country: country,
+        state: stateName,
+        city: city,
+        address1: address,
+        address2: profile?.address2 || '',
+        address3: profile?.address3 || '',
+        test_mode: profile?.test_mode !== undefined ? (profile.test_mode === '1' || profile.test_mode === 1 ? 1 : 0) : 0
+      });
+      Alert.alert('Éxito', 'Los datos de la cuenta se han actualizado correctamente.', [
+        { text: 'Aceptar', onPress: () => router.back() }
+      ]);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'No se pudieron actualizar los datos de la cuenta.');
+    }
+  };
+
+  if (isLoading && !profile) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: activeColors.background }]} edges={['top', 'bottom']}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={activeColors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -56,11 +174,11 @@ export const EditAccountScreen = () => {
                 <View style={styles.grid2Col}>
                   <View style={styles.col1}>
                     <Typography variant="label" color="outline" style={styles.fieldLabel}>Nombre</Typography>
-                    <TextField defaultValue="Ricardo" />
+                    <TextField value={firstName} onChangeText={setFirstName} />
                   </View>
                   <View style={styles.col1}>
                     <Typography variant="label" color="outline" style={styles.fieldLabel}>Apellido</Typography>
-                    <TextField defaultValue="Aranda" />
+                    <TextField value={lastName} onChangeText={setLastName} />
                   </View>
                 </View>
               </View>
@@ -79,22 +197,22 @@ export const EditAccountScreen = () => {
                     <View style={styles.iconLeft}>
                       <MaterialIcons name="mail" size={20} color={activeColors.outline} />
                     </View>
-                    <TextField defaultValue="ricardo.aranda@hasgreen.com" keyboardType="email-address" />
+                    <TextField value={email} onChangeText={setEmail} keyboardType="email-address" />
                   </View>
                 </View>
                 <View style={styles.grid3Col}>
                   <View style={styles.colThird}>
                     <Typography variant="label" color="outline" style={styles.fieldLabel}>Cód. País</Typography>
-                    <TextField defaultValue="+57 (COL)" />
+                    <TextField value={phoneCode} onChangeText={setPhoneCode} />
                   </View>
                   <View style={styles.colTwoThirds}>
                     <Typography variant="label" color="outline" style={styles.fieldLabel}>Celular</Typography>
-                    <TextField defaultValue="300 123 4567" keyboardType="phone-pad" />
+                    <TextField value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
                   </View>
                 </View>
                 <View style={styles.fieldGroup}>
                   <Typography variant="label" color="outline" style={styles.fieldLabel}>Teléfono Fijo (Opcional)</Typography>
-                  <TextField placeholder="N/A" keyboardType="phone-pad" />
+                  <TextField value={fixedPhone} onChangeText={setFixedPhone} keyboardType="phone-pad" />
                 </View>
               </View>
             </View>
@@ -108,17 +226,64 @@ export const EditAccountScreen = () => {
               <View style={[styles.cardForm, { backgroundColor: activeColors.surfaceContainerLowest }]}>
                 <View style={styles.grid2Col}>
                   <View style={styles.col1}>
-                    <Typography variant="label" color="outline" style={styles.fieldLabel}>País</Typography>
-                    <TextField defaultValue="Colombia" />
+                    <Typography variant="label" style={styles.fieldLabel}>País</Typography>
+                    <Pressable
+                      style={[styles.selectBox, { backgroundColor: activeColors.surfaceContainerLowest, borderColor: activeColors.outlineVariant, borderWidth: 1 }]}
+                      onPress={() => {
+                        setSearchQuery('');
+                        setCountryModal(true);
+                      }}
+                    >
+                      <Typography variant="body" color={country ? 'onSurface' : 'onSurfaceVariant'}>
+                        {country || 'Seleccionar'}
+                      </Typography>
+                      <MaterialIcons name="arrow-drop-down" size={20} color={activeColors.onSurfaceVariant} />
+                    </Pressable>
                   </View>
                   <View style={styles.col1}>
-                    <Typography variant="label" color="outline" style={styles.fieldLabel}>Departamento/Estado</Typography>
-                    <TextField defaultValue="Antioquia" />
+                    <Typography variant="label" style={styles.fieldLabel}>Departamento/Estado</Typography>
+                    <Pressable
+                      style={[
+                        styles.selectBox,
+                        { backgroundColor: country ? activeColors.surfaceContainerLowest : activeColors.surfaceContainerLow, borderColor: activeColors.outlineVariant, borderWidth: 1 },
+                        !country && { opacity: 0.5 }
+                      ]}
+                      onPress={() => {
+                        if (country) {
+                          setSearchQuery('');
+                          setStateModal(true);
+                        }
+                      }}
+                      disabled={!country}
+                    >
+                      <Typography variant="body" color={stateName ? 'onSurface' : 'onSurfaceVariant'}>
+                        {stateName || 'Seleccionar'}
+                      </Typography>
+                      <MaterialIcons name="arrow-drop-down" size={20} color={activeColors.onSurfaceVariant} />
+                    </Pressable>
                   </View>
                 </View>
                 <View style={styles.fieldGroup}>
-                  <Typography variant="label" color="outline" style={styles.fieldLabel}>Ciudad</Typography>
-                  <TextField defaultValue="Medellín" />
+                  <Typography variant="label" style={styles.fieldLabel}>Ciudad</Typography>
+                  <Pressable
+                    style={[
+                      styles.selectBox,
+                      { backgroundColor: stateName ? activeColors.surfaceContainerLowest : activeColors.surfaceContainerLow, borderColor: activeColors.outlineVariant, borderWidth: 1 },
+                      !stateName && { opacity: 0.5 }
+                    ]}
+                    onPress={() => {
+                      if (stateName) {
+                        setSearchQuery('');
+                        setCityModal(true);
+                      }
+                    }}
+                    disabled={!stateName}
+                  >
+                    <Typography variant="body" color={city ? 'onSurface' : 'onSurfaceVariant'}>
+                      {city || 'Seleccionar'}
+                    </Typography>
+                    <MaterialIcons name="arrow-drop-down" size={20} color={activeColors.onSurfaceVariant} />
+                  </Pressable>
                 </View>
                 <View style={styles.fieldGroup}>
                   <Typography variant="label" color="outline" style={styles.fieldLabel}>Dirección</Typography>
@@ -126,7 +291,7 @@ export const EditAccountScreen = () => {
                     <View style={styles.iconLeft}>
                       <MaterialIcons name="location-on" size={20} color={activeColors.outline} />
                     </View>
-                    <TextField defaultValue="Calle 10 # 43E - 20" />
+                    <TextField value={address} onChangeText={setAddress} />
                   </View>
                 </View>
               </View>
@@ -152,7 +317,7 @@ export const EditAccountScreen = () => {
             <View style={styles.actionArea}>
               <Pressable
                 style={({ pressed }) => [styles.updateBtn, pressed && { transform: [{ scale: 0.98 }] }]}
-                onPress={() => updateProfile({})}
+                onPress={handleUpdate}
                 disabled={isSaving}
               >
                 <View style={[styles.gradientBg, { backgroundColor: activeColors.primary }]}>
@@ -166,6 +331,138 @@ export const EditAccountScreen = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* MODAL: País */}
+      <Modal visible={countryModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: activeColors.surfaceContainerLowest }]}>
+            <View style={styles.modalHeader}>
+              <Typography variant="headline">Seleccionar País</Typography>
+              <Pressable onPress={() => setCountryModal(false)}>
+                <MaterialIcons name="close" size={24} color={activeColors.outline} />
+              </Pressable>
+            </View>
+            
+            <View style={[styles.searchBox, { backgroundColor: activeColors.surfaceContainerLow, borderColor: activeColors.outlineVariant }]}>
+              <MaterialIcons name="search" size={20} color={activeColors.outline} style={{ marginRight: 8 }} />
+              <TextInput
+                style={{ flex: 1, color: activeColors.onSurface }}
+                placeholder="Buscar país..."
+                placeholderTextColor={activeColors.outline}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+
+            <FlatList
+              data={countriesList.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))}
+              keyExtractor={(item) => item.isoCode}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={({ pressed }) => [styles.modalItem, pressed && { backgroundColor: activeColors.surfaceContainerLow }]}
+                  onPress={() => {
+                    setCountry(item.name);
+                    setStateName('');
+                    setCity('');
+                    setCountryModal(false);
+                  }}
+                >
+                  <Typography variant="body">{item.flag}  {item.name}</Typography>
+                </Pressable>
+              )}
+              initialNumToRender={20}
+              maxToRenderPerBatch={20}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL: Estado / Depto */}
+      <Modal visible={stateModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: activeColors.surfaceContainerLowest }]}>
+            <View style={styles.modalHeader}>
+              <Typography variant="headline">Seleccionar Departamento</Typography>
+              <Pressable onPress={() => setStateModal(false)}>
+                <MaterialIcons name="close" size={24} color={activeColors.outline} />
+              </Pressable>
+            </View>
+
+            <View style={[styles.searchBox, { backgroundColor: activeColors.surfaceContainerLow, borderColor: activeColors.outlineVariant }]}>
+              <MaterialIcons name="search" size={20} color={activeColors.outline} style={{ marginRight: 8 }} />
+              <TextInput
+                style={{ flex: 1, color: activeColors.onSurface }}
+                placeholder="Buscar departamento..."
+                placeholderTextColor={activeColors.outline}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+
+            <FlatList
+              data={statesList.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()))}
+              keyExtractor={(item) => item.isoCode}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={({ pressed }) => [styles.modalItem, pressed && { backgroundColor: activeColors.surfaceContainerLow }]}
+                  onPress={() => {
+                    setStateName(item.name);
+                    setCity('');
+                    setStateModal(false);
+                  }}
+                >
+                  <Typography variant="body">{item.name}</Typography>
+                </Pressable>
+              )}
+              initialNumToRender={20}
+              maxToRenderPerBatch={20}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL: Ciudad */}
+      <Modal visible={cityModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: activeColors.surfaceContainerLowest }]}>
+            <View style={styles.modalHeader}>
+              <Typography variant="headline">Seleccionar Ciudad</Typography>
+              <Pressable onPress={() => setCityModal(false)}>
+                <MaterialIcons name="close" size={24} color={activeColors.outline} />
+              </Pressable>
+            </View>
+
+            <View style={[styles.searchBox, { backgroundColor: activeColors.surfaceContainerLow, borderColor: activeColors.outlineVariant }]}>
+              <MaterialIcons name="search" size={20} color={activeColors.outline} style={{ marginRight: 8 }} />
+              <TextInput
+                style={{ flex: 1, color: activeColors.onSurface }}
+                placeholder="Buscar ciudad..."
+                placeholderTextColor={activeColors.outline}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+
+            <FlatList
+              data={citiesList.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))}
+              keyExtractor={(item, index) => `${item.name}-${index}`}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={({ pressed }) => [styles.modalItem, pressed && { backgroundColor: activeColors.surfaceContainerLow }]}
+                  onPress={() => {
+                    setCity(item.name);
+                    setCityModal(false);
+                  }}
+                >
+                  <Typography variant="body">{item.name}</Typography>
+                </Pressable>
+              )}
+              initialNumToRender={20}
+              maxToRenderPerBatch={20}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -237,4 +534,45 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   gradientBg: { alignItems: 'center', justifyContent: 'center', paddingVertical: 16 },
+  selectBox: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing[4],
+    borderRadius: Rounded.lg,
+    borderWidth: 1,
+    height: 56,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: Rounded.xl,
+    borderTopRightRadius: Rounded.xl,
+    height: '70%',
+    padding: Spacing[6],
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing[4],
+  },
+  modalItem: {
+    paddingVertical: Spacing[4],
+    paddingHorizontal: Spacing[2],
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    paddingHorizontal: Spacing[3],
+    height: 48,
+    marginBottom: Spacing[4],
+  },
 });

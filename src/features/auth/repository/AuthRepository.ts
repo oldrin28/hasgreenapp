@@ -95,15 +95,7 @@ export class AuthRepository {
    * Elimina los datos de sesión almacenados
    */
   static async logout(): Promise<void> {
-    const keys = [
-      'user_token',
-      'user_email',
-      'user_type',
-      'user_account_id',
-      'user_first_name',
-      'user_last_name'
-    ];
-    await AsyncStorage.multiRemove(keys);
+    await AsyncStorage.clear();
   }
 
   static async signup(data: any): Promise<boolean> {

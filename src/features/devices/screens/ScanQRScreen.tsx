@@ -1,32 +1,89 @@
-import React from 'react';
-import { StyleSheet, View, useColorScheme, Pressable, Image, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, useColorScheme, Pressable, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
 import { Spacing, Colors, Rounded } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import { Button } from '@/components/ui/Button';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 export function ScanQRScreen() {
   const router = useRouter();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
 
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
+
+  const handleBarCodeScanned = ({ data }: { data: string }) => {
+    if (scanned) return;
+    setScanned(true);
+    console.log('Código QR escaneado:', data);
+
+    const cleanData = data.trim();
+    const matchedType = cleanData.substring(0, 4);
+    const uniqueId = cleanData.substring(4);
+
+    if (mode === 'gateway') {
+      router.replace({
+        pathname: '/registrar-gateway',
+        params: { type: matchedType, uid: uniqueId, raw: cleanData }
+      });
+    } else {
+      router.replace({
+        pathname: '/nuevo-dispositivo',
+        params: { type: matchedType, uid: uniqueId, raw: cleanData }
+      });
+    }
+  };
+
+  if (!permission) {
+    // Camera permissions are still loading
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }]}>
+        <ActivityIndicator size="large" color={activeColors.primary} />
+      </View>
+    );
+  }
+
+  if (!permission.granted) {
+    // Camera permissions are not granted yet
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }]} edges={['top', 'bottom']}>
+        <View style={{ width: '80%', alignItems: 'center', gap: Spacing[6] }}>
+          <View style={[styles.iconCard, { backgroundColor: activeColors.surfaceContainerLowest }]}>
+            <MaterialIcons name="photo-camera" size={64} color={activeColors.primary} />
+          </View>
+          <Typography variant="headline" style={{ color: '#fff', fontSize: 22, fontWeight: '800', textAlign: 'center' }}>
+            Se necesita acceso a la cámara
+          </Typography>
+          <Typography variant="body" style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
+            Para escanear el código QR del dispositivo, necesitamos tu permiso para usar la cámara.
+          </Typography>
+          <Button label="Conceder Permiso" onPress={requestPermission} />
+          <Button 
+            variant="secondary" 
+            label="Cancelar" 
+            onPress={() => router.back()} 
+            style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255, 255, 255, 0.2)' }}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Simulated Camera Background */}
-      <View style={StyleSheet.absoluteFill}>
-        <Image 
-          source={{ uri: 'https://images.unsplash.com/photo-1558346490-a72e53ae2d4f?auto=format&fit=crop&w=1200&q=80' }}
-          style={styles.bgImage}
-        />
-        {Platform.OS === 'ios' ? (
-          <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)' }]} />
-        )}
-      </View>
+      {/* Real Device Camera View */}
+      <CameraView
+        style={StyleSheet.absoluteFill}
+        barcodeScannerSettings={{
+          barcodeTypes: ["qr"],
+        }}
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+      />
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         {/* Top App Bar */}
@@ -72,16 +129,10 @@ export function ScanQRScreen() {
           {/* Action Buttons */}
           <View style={styles.actionsContainer}>
             <Button 
-              variant="primary"
-              label="Encender Linterna"
-              leftIcon="flashlight-on"
-            />
-            
-            <Button 
               variant="secondary"
               label="Cancelar"
               onPress={() => router.back()}
-              style={{ backgroundColor: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.2)' }}
+              style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'rgba(255,255,255,0.3)' }}
             />
           </View>
           
@@ -90,23 +141,15 @@ export function ScanQRScreen() {
         {/* Status Indicators */}
         <View style={styles.statusContainer}>
           <View style={styles.statusGrid}>
-            
             <View style={styles.statusCard}>
               <View style={[styles.statusIndicator, { backgroundColor: activeColors.primary }]} />
               <View>
                 <Typography variant="label" style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '700' }}>Estado</Typography>
-                <Typography variant="body" style={{ color: Colors.light.surfaceContainerLowest, fontSize: 14, fontWeight: '500' }}>Buscando...</Typography>
+                <Typography variant="body" style={{ color: Colors.light.surfaceContainerLowest, fontSize: 14, fontWeight: '500' }}>
+                  {scanned ? 'Código Detectado' : 'Buscando...'}
+                </Typography>
               </View>
             </View>
-
-            <View style={styles.statusCard}>
-              <View style={[styles.statusIndicator, { backgroundColor: activeColors.primaryContainer }]} />
-              <View>
-                <Typography variant="label" style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '700' }}>Red</Typography>
-                <Typography variant="body" style={{ color: Colors.light.surfaceContainerLowest, fontSize: 14, fontWeight: '500' }}>IoT_Secure_X</Typography>
-              </View>
-            </View>
-            
           </View>
         </View>
       </SafeAreaView>
@@ -116,13 +159,9 @@ export function ScanQRScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  bgImage: {
-    width: '100%',
-    height: '100%',
-    opacity: 0.6,
-  },
   safeArea: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)'
   },
   topBar: {
     flexDirection: 'row',
@@ -130,7 +169,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing[6],
     paddingVertical: Spacing[4],
-    backgroundColor: 'rgba(245, 246, 247, 0.95)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     zIndex: 50,
   },
   avatarBox: {
@@ -218,7 +257,6 @@ const styles = StyleSheet.create({
   },
   statusGrid: {
     flexDirection: 'row',
-    gap: Spacing[3],
     width: '100%',
     maxWidth: 448,
   },
@@ -237,5 +275,17 @@ const styles = StyleSheet.create({
     width: 8,
     height: 32,
     borderRadius: 4,
+  },
+  iconCard: {
+    width: 128,
+    height: 128,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#2c2f30',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
   },
 });

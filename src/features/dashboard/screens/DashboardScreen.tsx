@@ -1,17 +1,53 @@
-import React from 'react';
-import { StyleSheet, View, ScrollView, useColorScheme, Pressable, ActivityIndicator } from 'react-native';
+import React, { useCallback } from 'react';
+import { StyleSheet, View, ScrollView, useColorScheme, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Spacing, Colors, Rounded } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useDashboard } from '../hooks/useDashboard';
 
 export function DashboardScreen() {
+  const router = useRouter();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
-  const { data, isLoading } = useDashboard();
+  const { data, isLoading, fetchDashboardData } = useDashboard();
+  const { fcmToken } = usePushNotifications();
+
+  const handleTestNotification = async () => {
+    console.log('[FIREBASE FCM] Native Device Push Token:', fcmToken);
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Prueba de Alerta HASGREEN 🔔",
+          body: `Token FCM: ${fcmToken ? fcmToken.substring(0, 30) + '...' : 'No obtenido'}\n¡Sonido personalizado configurado!`,
+          sound: 'notificacion',
+        },
+        trigger: {
+          channelId: 'hasgreen_sound_channel',
+        },
+      });
+
+      Alert.alert(
+        "Token FCM & Notificación",
+        `Push Token obtenido:\n\n${fcmToken || 'No disponible (use un dispositivo físico)'}\n\nNotificación de prueba enviada con éxito.`,
+        [{ text: "OK" }]
+      );
+    } catch (error) {
+      console.error('Error al enviar notificación de prueba:', error);
+      Alert.alert("Error", "No se pudo enviar la notificación de prueba.");
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDashboardData();
+    }, [])
+  );
 
   if (isLoading || !data) {
     return (
@@ -63,6 +99,7 @@ export function DashboardScreen() {
             label="Probar Notificación" 
             leftIcon="notification-important" 
             style={{ alignSelf: 'flex-start', marginTop: Spacing[4] }} 
+            onPress={handleTestNotification}
           />
         </View>
 
@@ -126,7 +163,9 @@ export function DashboardScreen() {
         <View style={styles.listSection}>
           <View style={styles.listHeader}>
             <Typography variant="headline" style={{ fontSize: 20 }}>Gateways Recientes</Typography>
-            <Typography variant="label" style={{ color: activeColors.primary, fontWeight: '600' }}>Ver todos</Typography>
+            <Pressable onPress={() => router.push('/gateways')}>
+              <Typography variant="label" style={{ color: activeColors.primary, fontWeight: '600' }}>Ver todos</Typography>
+            </Pressable>
           </View>
           {data.recentGateways.map((gtw: any, index: number) => (
             <Card key={index} layer="lowest" style={styles.listItem}>
@@ -134,10 +173,12 @@ export function DashboardScreen() {
                 <MaterialIcons name="router" size={20} color={activeColors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Typography variant="headline" style={{ fontSize: 14 }}>{gtw.id}</Typography>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Typography variant="headline" style={{ fontSize: 14 }}>{gtw.name}</Typography>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing[2] }}>
                   <MaterialIcons name="location-on" size={12} color={activeColors.onSurfaceVariant} />
-                  <Typography variant="label" color="onSurfaceVariant" style={{ marginLeft: 2, fontSize: 12 }}>{gtw.location}</Typography>
+                  <Typography variant="label" color="onSurfaceVariant" style={{ fontSize: 12 }}>{gtw.location}</Typography>
+                  <Typography variant="label" color="outline" style={{ fontSize: 12 }}>•</Typography>
+                  <Typography variant="label" color="onSurfaceVariant" style={{ fontSize: 12 }}>IP: {gtw.ip}</Typography>
                 </View>
               </View>
               <View style={[styles.badge, { backgroundColor: gtw.status === 'Activo' ? activeColors.secondaryContainer : activeColors.surfaceContainerHigh }]}>
@@ -151,19 +192,27 @@ export function DashboardScreen() {
         <View style={styles.listSection}>
           <View style={styles.listHeader}>
             <Typography variant="headline" style={{ fontSize: 20 }}>Últimos Dispositivos</Typography>
-            <Typography variant="label" style={{ color: activeColors.primary, fontWeight: '600' }}>Ver todos</Typography>
+            <Pressable onPress={() => router.push('/dispositivos')}>
+              <Typography variant="label" style={{ color: activeColors.primary, fontWeight: '600' }}>Ver todos</Typography>
+            </Pressable>
           </View>
           {data.recentDevices.map((dev: any, index: number) => (
             <Card key={index} layer="lowest" style={styles.listItem}>
               <View style={[styles.listIconBox, { backgroundColor: activeColors.surfaceContainer }]}>
                 <MaterialIcons name="sensors" size={20} color={activeColors.secondary} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Typography variant="headline" style={{ fontSize: 14 }}>{dev.id}</Typography>
-                <Typography variant="label" color="onSurfaceVariant" style={{ fontSize: 12 }}>UID: {dev.uid}</Typography>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Typography variant="headline" style={{ fontSize: 14 }}>{dev.name}</Typography>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing[2] }}>
+                  <Typography variant="label" color="onSurfaceVariant" style={{ fontSize: 12 }}>Tipo: {dev.type}</Typography>
+                  <Typography variant="label" color="outline" style={{ fontSize: 12 }}>•</Typography>
+                  <Typography variant="label" color="onSurfaceVariant" style={{ fontSize: 12 }}>Ubicación: {dev.location}</Typography>
+                  <Typography variant="label" color="outline" style={{ fontSize: 12 }}>•</Typography>
+                  <Typography variant="label" color="onSurfaceVariant" style={{ fontSize: 12 }}>Paciente: {dev.patientName}</Typography>
+                </View>
               </View>
-              <View style={[styles.badge, { backgroundColor: activeColors.secondaryContainer }]}>
-                <Typography variant="label" style={{ fontSize: 10, color: activeColors.onSecondaryContainer, fontWeight: '700', textTransform: 'uppercase' }}>{dev.status}</Typography>
+              <View style={[styles.badge, { backgroundColor: dev.status === 'Activo' ? activeColors.secondaryContainer : activeColors.surfaceContainerHigh }]}>
+                <Typography variant="label" style={{ fontSize: 10, color: dev.status === 'Activo' ? activeColors.onSecondaryContainer : activeColors.onSurfaceVariant, fontWeight: '700', textTransform: 'uppercase' }}>{dev.status}</Typography>
               </View>
             </Card>
           ))}

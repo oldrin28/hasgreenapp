@@ -1,22 +1,40 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, useColorScheme, Pressable, TextInput } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, View, ScrollView, useColorScheme, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
 import { Spacing, Colors, Rounded } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useUsers } from '../../users/hooks/useUsers';
 
 export const ConfigNotificationsStep2Screen = () => {
   const router = useRouter();
+  const { deviceId } = useLocalSearchParams<{ deviceId: string }>();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
-  const [selectedUser, setSelectedUser] = useState<string>('user1');
+  const { users, loadCachedUsers, isLoading } = useUsers();
+  
+  const [selectedUser, setSelectedUser] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const users = [
-    { id: 'user1', name: 'Oldrin Pruebaquince', email: 'oldrin.test@hasgreen.io', phone: '+52 1 55 1234 5678' },
-    { id: 'user2', name: 'user update uno dos', email: 'update.one@provider.com', phone: '+52 1 55 9876 5432' },
-    { id: 'user3', name: 'Madelein Pérez', email: 'm.perez@service.net', phone: '+52 1 55 5555 1212' },
-  ];
+  useFocusEffect(
+    useCallback(() => {
+      loadCachedUsers();
+    }, [])
+  );
+
+  const filteredUsers = users.filter((user: any) => {
+    const name = `${user.guest_first_name || ''} ${user.guest_last_name || ''}`;
+    return !searchQuery || 
+      name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (user.guest_email_address || '').toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  useEffect(() => {
+    if (!selectedUser && filteredUsers.length > 0) {
+      setSelectedUser(String(filteredUsers[0].guest_account_id));
+    }
+  }, [filteredUsers, selectedUser]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: activeColors.background }]} edges={['top', 'bottom']}>
@@ -52,50 +70,63 @@ export const ConfigNotificationsStep2Screen = () => {
         {/* Search */}
         <View style={[styles.searchContainer, { backgroundColor: activeColors.surfaceContainerLowest, borderColor: 'rgba(171, 173, 174, 0.15)' }]}>
           <MaterialIcons name="search" size={24} color={activeColors.outline} style={styles.searchIcon} />
-          <TextInput style={[styles.searchInput, { color: activeColors.onSurface }]} placeholder="Buscar usuario..." placeholderTextColor={activeColors.outlineVariant} />
+          <TextInput 
+            style={[styles.searchInput, { color: activeColors.onSurface }]} 
+            placeholder="Buscar usuario..." 
+            placeholderTextColor={activeColors.outlineVariant}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
         </View>
 
         {/* User List */}
         <View style={styles.userList}>
-          {users.map((user) => (
-            <Pressable
-              key={user.id}
-              style={[styles.userCard, { backgroundColor: activeColors.surfaceContainerLowest, borderLeftColor: selectedUser === user.id ? activeColors.primary : activeColors.surfaceContainerHighest }]}
-              onPress={() => setSelectedUser(user.id)}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing[5], flex: 1 }}>
-                <View style={[styles.iconBox, { backgroundColor: selectedUser === user.id ? 'rgba(8, 107, 0, 0.15)' : activeColors.surfaceContainerLow }]}>
-                  <MaterialIcons name="person" size={28} color={selectedUser === user.id ? activeColors.primary : activeColors.onSurfaceVariant} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700' }}>{user.name}</Typography>
-                  <View style={styles.userInfoRow}>
-                    <MaterialIcons name="mail" size={16} color={activeColors.onSurfaceVariant} />
-                    <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>{user.email}</Typography>
+          {isLoading && filteredUsers.length === 0 ? (
+            <ActivityIndicator size="large" color={activeColors.primary} style={{ marginTop: Spacing[6] }} />
+          ) : (
+            filteredUsers.map((user: any) => {
+              const userIdStr = String(user.guest_account_id);
+              const userName = `${user.guest_first_name || ''} ${user.guest_last_name || ''}`.trim() || 'Usuario sin nombre';
+              const isSelected = selectedUser === userIdStr;
+
+              return (
+                <Pressable
+                  key={userIdStr}
+                  style={[styles.userCard, { backgroundColor: activeColors.surfaceContainerLowest, borderLeftColor: isSelected ? activeColors.primary : activeColors.surfaceContainerHighest }]}
+                  onPress={() => setSelectedUser(userIdStr)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing[5], flex: 1 }}>
+                    <View style={[styles.iconBox, { backgroundColor: isSelected ? 'rgba(8, 107, 0, 0.15)' : activeColors.surfaceContainerLow }]}>
+                      <MaterialIcons name="person" size={28} color={isSelected ? activeColors.primary : activeColors.onSurfaceVariant} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700' }}>{userName}</Typography>
+                      <View style={styles.userInfoRow}>
+                        <MaterialIcons name="mail" size={16} color={activeColors.onSurfaceVariant} />
+                        <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>{user.guest_email_address || 'Sin correo'}</Typography>
+                      </View>
+                    </View>
                   </View>
-                  <View style={styles.userInfoRow}>
-                    <MaterialIcons name="call" size={16} color={activeColors.onSurfaceVariant} />
-                    <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>{user.phone}</Typography>
+                  <View style={[styles.chevronBtn, isSelected && { backgroundColor: activeColors.surfaceContainerLow }]}>
+                    <MaterialIcons name="chevron-right" size={24} color={isSelected ? activeColors.primary : activeColors.onSurfaceVariant} />
                   </View>
-                </View>
-              </View>
-              <View style={[styles.chevronBtn, selectedUser === user.id && { backgroundColor: activeColors.surfaceContainerLow }]}>
-                <MaterialIcons name="chevron-right" size={24} color={selectedUser === user.id ? activeColors.primary : activeColors.onSurfaceVariant} />
-              </View>
-            </Pressable>
-          ))}
+                </Pressable>
+              );
+            })
+          )}
         </View>
 
         {/* Action */}
         <View style={styles.actionArea}>
           <Pressable
             style={({ pressed }) => [styles.nextBtn, { backgroundColor: activeColors.primary }, pressed && { transform: [{ scale: 0.98 }] }]}
-            onPress={() => router.push('/config-notificaciones-3')}
+            onPress={() => router.push({ pathname: '/config-notificaciones-3', params: { deviceId, userId: selectedUser } } as any)}
+            disabled={!selectedUser}
           >
             <Typography variant="headline" style={{ color: activeColors.onPrimary, fontWeight: '700', fontSize: 16 }}>Continuar al paso 3</Typography>
             <MaterialIcons name="arrow-forward" size={24} color={activeColors.onPrimary} />
           </Pressable>
-          <Pressable style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}>
+          <Pressable style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]} onPress={() => router.back()}>
             <Typography variant="label" style={{ color: activeColors.primary, fontWeight: '600', fontSize: 14, textDecorationLine: 'underline' }}>Cancelar configuración</Typography>
           </Pressable>
         </View>

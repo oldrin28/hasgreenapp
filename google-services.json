@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "155699051271",
+    "project_id": "hasgreenapp",
+    "storage_bucket": "hasgreenapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:155699051271:android:aab4993985a1bc1a5963a2",
+        "android_client_info": {
+          "package_name": "com.hasgreen.hasgreenapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCIiOZFJAxmJiUJJVJ3eoOJbXlgYHb7K8s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

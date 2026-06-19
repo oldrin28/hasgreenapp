@@ -1,7 +1,7 @@
-import React from 'react';
-import { StyleSheet, View, ScrollView, useColorScheme, Pressable, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, ScrollView, useColorScheme, Pressable, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
 import { Card } from '@/components/ui/Card';
 import { TextField } from '@/components/ui/TextField';
@@ -12,9 +12,34 @@ import { useGateways } from '../hooks/useGateways';
 
 export function EditGatewayScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
-  const { updateGateway, deleteGateway, isLoading } = useGateways();
+  const { loadGateway, gateway, updateGateway, deleteGateway, isLoading } = useGateways();
+
+  const [gatewayName, setGatewayName] = useState('');
+  const [gatewayLocation, setGatewayLocation] = useState('');
+
+  useEffect(() => {
+    if (id) {
+      loadGateway(id).then(data => {
+        if (data) {
+          setGatewayName(data.gateway_name || '');
+          setGatewayLocation(data.gateway_location || '');
+        }
+      });
+    }
+  }, [id]);
+
+  if (isLoading && !gatewayName) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: activeColors.background }]}>
+        <ActivityIndicator size="large" color={activeColors.primary} />
+      </View>
+    );
+  }
+
+  const isGatewayActive = gateway?.gateway_status === 1 || gateway?.gateway_status === '1';
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -29,7 +54,20 @@ export function EditGatewayScreen() {
             Editar Gateway
           </Typography>
         </View>
-        <Pressable onPress={() => deleteGateway('1')} style={({pressed}) => [styles.iconBtn, pressed && { backgroundColor: activeColors.surfaceContainerLow }]} disabled={isLoading}>
+        <Pressable 
+          onPress={() => {
+            Alert.alert(
+              'Eliminar Gateway',
+              '¿Estás seguro de que deseas eliminar este gateway?',
+              [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Eliminar', style: 'destructive', onPress: () => deleteGateway(id || '') }
+              ]
+            );
+          }}
+          style={({pressed}) => [styles.iconBtn, pressed && { backgroundColor: activeColors.surfaceContainerLow }]} 
+          disabled={isLoading}
+        >
           <MaterialIcons name="delete" size={24} color={activeColors.error} />
         </Pressable>
       </View>
@@ -42,27 +80,41 @@ export function EditGatewayScreen() {
           
           {/* Hero Section / Status Card */}
           <View style={styles.heroSection}>
-            <Card layer="lowest" style={[styles.statusCard, { borderLeftColor: activeColors.primary, borderLeftWidth: 4 }]}>
+            <Card layer="lowest" style={[styles.statusCard, { borderLeftColor: isGatewayActive ? activeColors.primary : activeColors.outlineVariant, borderLeftWidth: 4 }]}>
               <View style={styles.statusCardTop}>
                 <View>
                   <Typography variant="label" color="onSurfaceVariant" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
-                    Identificador Único
+                    Identificador Único (UID)
                   </Typography>
-                  <Typography variant="headline" style={{ fontSize: 24, fontWeight: '700' }}>GW-7829-PRO</Typography>
+                  <Typography variant="headline" style={{ fontSize: 20, fontWeight: '700' }}>
+                    {gateway?.gateway_unique_id || 'N/A'}
+                  </Typography>
                 </View>
-                <View style={[styles.activeBadge, { backgroundColor: 'rgba(8, 107, 0, 0.1)' }]}>
-                  <Typography variant="label" style={{ color: activeColors.primary, fontSize: 12, fontWeight: '700' }}>ACTIVO</Typography>
+                <View style={[styles.activeBadge, { backgroundColor: isGatewayActive ? 'rgba(8, 107, 0, 0.1)' : activeColors.surfaceContainerHigh }]}>
+                  <Typography variant="label" style={{ color: isGatewayActive ? activeColors.primary : activeColors.outline, fontSize: 12, fontWeight: '700' }}>
+                    {isGatewayActive ? 'ACTIVO' : 'INACTIVO'}
+                  </Typography>
                 </View>
               </View>
 
               <View style={styles.statusCardBottom}>
                 <View style={styles.statusRow}>
                   <MaterialIcons name="router" size={16} color={activeColors.onSurfaceVariant} />
-                  <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>v2.4.1</Typography>
+                  <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>
+                    {gateway?.gateway_firmware_version || 'N/A'}
+                  </Typography>
                 </View>
                 <View style={styles.statusRow}>
-                  <MaterialIcons name="signal-cellular-alt" size={16} color={activeColors.onSurfaceVariant} />
-                  <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>4G LTE</Typography>
+                  <MaterialIcons name="wifi" size={16} color={activeColors.onSurfaceVariant} />
+                  <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>
+                    {gateway?.gateway_connected_to || 'Desconectado'}
+                  </Typography>
+                </View>
+                <View style={styles.statusRow}>
+                  <MaterialIcons name="lan" size={16} color={activeColors.onSurfaceVariant} />
+                  <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>
+                    {gateway?.gateway_ip_address || '0.0.0.0'}
+                  </Typography>
                 </View>
               </View>
             </Card>
@@ -70,59 +122,22 @@ export function EditGatewayScreen() {
 
           {/* Form */}
           <View style={styles.formContainer}>
-            
             <View style={styles.formField}>
-              <TextField label="Nombre del Dispositivo" defaultValue="Gateway Principal Norte" editable={!isLoading} />
+              <TextField 
+                label="Nombre del Dispositivo" 
+                value={gatewayName} 
+                onChangeText={setGatewayName} 
+                editable={!isLoading} 
+              />
             </View>
-
             <View style={styles.formField}>
-              <Typography variant="label" style={{ fontSize: 14, fontWeight: '600', marginBottom: Spacing[2], marginLeft: 4 }}>
-                Ubicación Geográfica
-              </Typography>
-              <View style={[styles.mapContainer, { borderColor: activeColors.outlineVariant, backgroundColor: activeColors.surfaceContainer }]}>
-                <Image 
-                  source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuByrhR0xk5UWPn4rjxoNo1OKai47kNhKRJD_PM_0C40lZKDBsUDcetizhpcvSNyUylovd2A7LAa1kSIl1_iNqG8vhnKdW94jn8zfPNWOIvOxmejNE4hE1Dxb8meN5Ko3znloci1FWVk4iSlofZHKWTVe0p0Rv_ay7djb0qsHibjZ9CAdGKoE0iCdpUNi9atbZYK7t_sG21om1Nm_Res-zlgc_q_9xpRx0P-FY5crBWUNDEzkT65cXnUKsuJVApbY7CVcrEGRv5GNAS5' }}
-                  style={[styles.mapImage, { opacity: 0.8 }]}
-                />
-                <View style={styles.mapPin}>
-                  <MaterialIcons name="location-on" size={36} color={activeColors.primary} />
-                </View>
-                <View style={styles.mapOverlayLabel}>
-                  <View style={[styles.glassPanel, { backgroundColor: 'rgba(255,255,255,0.9)' }]}>
-                    <Typography variant="label" style={{ fontSize: 12, fontWeight: '500', color: '#2c2f30' }}>Calle de la Tecnología, 14, Planta 2</Typography>
-                    <Typography variant="label" style={{ fontSize: 12, fontWeight: '700', color: activeColors.primary, textTransform: 'uppercase' }}>Cambiar</Typography>
-                  </View>
-                </View>
-              </View>
+              <TextField 
+                label="Ubicación Física" 
+                value={gatewayLocation} 
+                onChangeText={setGatewayLocation} 
+                editable={!isLoading} 
+              />
             </View>
-
-            <View style={styles.grid2Col}>
-              <View style={styles.col1}>
-                <TextField label="Protocolo" defaultValue="Zigbee 3.0" editable={!isLoading} />
-              </View>
-              <View style={styles.col1}>
-                <TextField label="Frecuencia" defaultValue="2.4 GHz" editable={!isLoading} />
-              </View>
-            </View>
-
-            {/* Advanced Settings Toggle */}
-            <Pressable style={({pressed}) => [
-              styles.advancedSettings, 
-              { backgroundColor: activeColors.surfaceContainerLow, borderColor: 'transparent' },
-              pressed && { opacity: 0.8 }
-            ]} disabled={isLoading}>
-              <View style={styles.advancedLeft}>
-                <View style={[styles.advancedIconBox, { backgroundColor: activeColors.surfaceContainerLowest }]}>
-                  <MaterialIcons name="settings-ethernet" size={20} color={activeColors.primary} />
-                </View>
-                <View>
-                  <Typography variant="headline" style={{ fontSize: 14, fontWeight: '700' }}>Configuración IP Estática</Typography>
-                  <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 12 }}>DHCP desactivado • 192.168.1.45</Typography>
-                </View>
-              </View>
-              <MaterialIcons name="chevron-right" size={24} color={activeColors.outlineVariant} />
-            </Pressable>
-
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -134,7 +149,11 @@ export function EditGatewayScreen() {
             variant="primary"
             label={isLoading ? "Guardando..." : "Guardar Cambios"}
             leftIcon="save"
-            onPress={() => updateGateway('1', {})}
+            onPress={() => updateGateway(id || '1', { 
+              ...gateway, 
+              gateway_name: gatewayName, 
+              gateway_location: gatewayLocation 
+            })}
             disabled={isLoading}
           />
         </View>
@@ -159,7 +178,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Spacing[6],
-    paddingBottom: Spacing[12] * 2, // Extra space for fixed action bar
+    paddingBottom: Spacing[12] * 2,
     maxWidth: 768,
     width: '100%',
     alignSelf: 'center',
@@ -205,74 +224,6 @@ const styles = StyleSheet.create({
   },
   formField: {
     width: '100%',
-  },
-  mapContainer: {
-    width: '100%',
-    height: 160,
-    borderRadius: Rounded.xl,
-    overflow: 'hidden',
-    borderWidth: 1,
-    position: 'relative',
-  },
-  mapImage: {
-    width: '100%',
-    height: '100%',
-  },
-  mapPin: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapOverlayLabel: {
-    position: 'absolute',
-    bottom: Spacing[3],
-    left: Spacing[3],
-    right: Spacing[3],
-  },
-  glassPanel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing[3],
-    paddingVertical: Spacing[2],
-    borderRadius: Rounded.lg,
-  },
-  grid2Col: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing[4],
-  },
-  col1: {
-    width: '100%',
-    minWidth: '45%',
-    flex: 1,
-  },
-  advancedSettings: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing[4],
-    borderRadius: Rounded.xl,
-    borderWidth: 1,
-    marginTop: Spacing[4],
-  },
-  advancedLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing[3],
-  },
-  advancedIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
   },
   actionContainer: {
     position: 'absolute',

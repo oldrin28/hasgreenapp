@@ -1,7 +1,7 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView, useColorScheme, Pressable } from 'react-native';
+import { StyleSheet, View, ScrollView, useColorScheme, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
 import { Card } from '@/components/ui/Card';
 import { Spacing, Colors, Rounded } from '@/constants/theme';
@@ -13,12 +13,35 @@ export const ProfileScreen = () => {
   const router = useRouter();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
-  const { profile, logout } = useProfile();
+  const { profile, logout, deleteAccount, fetchProfile } = useProfile();
 
-  const notifications = profile?.notifications ?? { sms: 4, voice: 2, email: 4, push: 10, whatsapp: 4 };
-  const initials = profile?.initials ?? 'OP';
-  const name = profile?.name ?? 'Cargando...';
-  const status = profile?.status ?? '';
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchProfile();
+    }, [])
+  );
+
+  const notifications = profile
+    ? {
+        sms: profile.sms_notifications_counter ?? 0,
+        voice: profile.voice_notifications_counter ?? 0,
+        email: profile.email_notifications_counter ?? 0,
+        push: profile.push_notifications_counter ?? 0,
+        whatsapp: profile.whatsapp_notifications_counter ?? 0,
+      }
+    : { sms: 0, voice: 0, email: 0, push: 0, whatsapp: 0 };
+
+  const name = profile
+    ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Sin Nombre'
+    : 'Cargando...';
+
+  const initials = profile
+    ? ((profile.first_name?.[0] || '') + (profile.last_name?.[0] || '')).toUpperCase() || 'U'
+    : 'OP';
+
+  const status = profile
+    ? (profile.status === 1 ? 'Active' : 'Inactive')
+    : '';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -114,10 +137,60 @@ export const ProfileScreen = () => {
             onPress={() => router.push('/cambiar-contrasena' as any)}
           >
             <View style={styles.settingLeft}>
-              <View style={[styles.settingIconBox, { backgroundColor: activeColors.errorContainer, opacity: 0.8 }]}>
-                <MaterialIcons name="lock-reset" size={24} color={activeColors.error} />
+              <View style={[styles.settingIconBox, { backgroundColor: activeColors.primaryContainer, opacity: 0.8 }]}>
+                <MaterialIcons name="lock-reset" size={24} color={activeColors.primary} />
               </View>
               <Typography variant="body" style={{ fontWeight: '500' }}>Cambiar contraseña</Typography>
+            </View>
+            <MaterialIcons name="chevron-right" size={24} color={activeColors.outline} />
+          </Pressable>
+
+          <View style={[styles.divider, { backgroundColor: activeColors.outlineVariant, opacity: 0.2 }]} />
+
+          <Pressable
+            style={({ pressed }) => [styles.settingRow, pressed && { backgroundColor: activeColors.surfaceContainerLow }]}
+            onPress={() => Alert.alert('Planes de Pago', 'Próximamente podrás gestionar tus suscripciones y planes de pago desde aquí.')}
+          >
+            <View style={styles.settingLeft}>
+              <View style={[styles.settingIconBox, { backgroundColor: activeColors.secondaryContainer, opacity: 0.8 }]}>
+                <MaterialIcons name="payments" size={24} color={activeColors.secondary} />
+              </View>
+              <Typography variant="body" style={{ fontWeight: '500' }}>Planes de pago</Typography>
+            </View>
+            <MaterialIcons name="chevron-right" size={24} color={activeColors.outline} />
+          </Pressable>
+
+          <View style={[styles.divider, { backgroundColor: activeColors.outlineVariant, opacity: 0.2 }]} />
+
+          <Pressable
+            style={({ pressed }) => [styles.settingRow, pressed && { backgroundColor: activeColors.surfaceContainerLow }]}
+            onPress={() => {
+              Alert.alert(
+                'Eliminar Cuenta',
+                '¿Está seguro de que desea eliminar su cuenta? Esta acción es irreversible y perderá todos sus datos.',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  { 
+                    text: 'Eliminar', 
+                    style: 'destructive', 
+                    onPress: async () => {
+                      try {
+                        await deleteAccount();
+                        Alert.alert('Éxito', 'Su cuenta ha sido eliminada exitosamente.');
+                      } catch (error: any) {
+                        Alert.alert('Error', error.message || 'No se pudo eliminar la cuenta. Intente nuevamente.');
+                      }
+                    } 
+                  }
+                ]
+              );
+            }}
+          >
+            <View style={styles.settingLeft}>
+              <View style={[styles.settingIconBox, { backgroundColor: activeColors.errorContainer, opacity: 0.8 }]}>
+                <MaterialIcons name="person-remove" size={24} color={activeColors.error} />
+              </View>
+              <Typography variant="body" style={{ fontWeight: '500' }}>Eliminar cuenta</Typography>
             </View>
             <MaterialIcons name="chevron-right" size={24} color={activeColors.outline} />
           </Pressable>
@@ -126,10 +199,11 @@ export const ProfileScreen = () => {
         {/* Sign Out */}
         <View style={styles.signOutContainer}>
           <Pressable
-            style={({ pressed }) => [styles.signOutBtn, { backgroundColor: activeColors.errorContainer, opacity: 0.8 }, pressed && { transform: [{ scale: 0.98 }] }]}
+            style={({ pressed }) => [styles.signOutBtnMinimal, pressed && { opacity: 0.6 }]}
             onPress={logout}
           >
-            <Typography variant="headline" style={{ color: activeColors.error, fontWeight: '700' }}>Cerrar sesión</Typography>
+            <MaterialIcons name="logout" size={20} color={activeColors.error} />
+            <Typography variant="body" style={{ color: activeColors.error, fontWeight: '600' }}>Cerrar sesión</Typography>
           </Pressable>
         </View>
 
@@ -257,10 +331,11 @@ const styles = StyleSheet.create({
   signOutContainer: {
     marginBottom: Spacing[4],
   },
-  signOutBtn: {
-    paddingVertical: Spacing[4],
-    borderRadius: Rounded.xl,
+  signOutBtnMinimal: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: Spacing[2],
+    paddingVertical: Spacing[3],
   },
 });

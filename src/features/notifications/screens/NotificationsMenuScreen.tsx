@@ -76,7 +76,7 @@ export const NotificationsMenuScreen = () => {
           </View>
           <View style={styles.optionContent}>
             <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700', marginBottom: 4 }}>
-              Configurar Alarmas
+              Configurar Alarmas Locales
             </Typography>
             <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14, lineHeight: 20 }}>
               Gestionar qué alarmas se activan al presionar cada botón.

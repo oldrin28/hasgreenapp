@@ -1,23 +1,57 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, useColorScheme, Pressable, KeyboardAvoidingView, Platform, Switch } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, ScrollView, useColorScheme, Pressable, KeyboardAvoidingView, Platform, Switch, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
 import { Card } from '@/components/ui/Card';
 import { TextField } from '@/components/ui/TextField';
-import { Button } from '@/components/ui/Button';
 import { Spacing, Colors, Rounded } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useUsers } from '../hooks/useUsers';
+import { UsersRepository } from '../repository/UsersRepository';
 
 export const EditUserScreen = () => {
   const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
   const { updateUser, deleteUser, isSaving } = useUsers();
 
-  const [notify, setNotify] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [notify, setNotify] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      setIsLoading(true);
+      UsersRepository.getUserById(id).then(data => {
+        if (data) {
+          setUser(data);
+          setNotify(data.guest_extra_info === 1);
+        }
+      }).catch(err => {
+        Alert.alert('Error', err.message || 'Error al cargar los datos del usuario.');
+      }).finally(() => {
+        setIsLoading(false);
+      });
+    }
+  }, [id]);
+
+  if (isLoading && !user) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: activeColors.background }]}>
+        <ActivityIndicator size="large" color={activeColors.primary} />
+      </View>
+    );
+  }
+
+  const handleUpdate = () => {
+    updateUser(id || '1', {
+      ...user,
+      send_extra_info: notify ? 1 : 0
+    });
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -34,7 +68,17 @@ export const EditUserScreen = () => {
         </View>
         <Pressable
           style={({ pressed }) => [styles.iconBtn, pressed && { backgroundColor: activeColors.surfaceContainerLow }]}
-          onPress={() => deleteUser('1')}
+          onPress={() => {
+            Alert.alert(
+              'Eliminar Colaborador',
+              '¿Estás seguro de que deseas eliminar este colaborador?',
+              [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Eliminar', style: 'destructive', onPress: () => deleteUser(user?.guest_email_address || '') }
+              ]
+            );
+          }}
+          disabled={isSaving}
         >
           <MaterialIcons name="delete" size={24} color={activeColors.error} />
         </Pressable>
@@ -45,69 +89,69 @@ export const EditUserScreen = () => {
 
           {/* Page Introduction */}
           <View style={styles.pageIntro}>
-            <Typography variant="display" style={{ fontSize: 28, letterSpacing: -1 }}>Editar Perfil de Usuario</Typography>
+            <Typography variant="display" style={{ fontSize: 28, letterSpacing: -1 }}>Editar Perfil</Typography>
             <Typography variant="body" color="onSurfaceVariant" style={{ marginTop: Spacing[2] }}>
-              Actualiza la información de registro y preferencias de contacto del usuario seleccionado.
+              Visualice los detalles del colaborador y configure sus permisos de información adicional.
             </Typography>
           </View>
 
           {/* Form */}
           <View style={styles.formContainer}>
 
-            {/* Información Personal */}
+            {/* Información del Colaborador (Informativa/Lectura) */}
             <View style={[styles.outerCard, { backgroundColor: activeColors.surfaceContainerLow }]}>
               <Card layer="lowest" style={styles.innerCard}>
                 <View style={styles.sectionHeader}>
                   <View style={[styles.headerPill, { backgroundColor: activeColors.primary }]} />
-                  <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700' }}>Información Personal</Typography>
+                  <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700' }}>Información del Colaborador</Typography>
                 </View>
                 <View style={styles.grid2Col}>
-                  <View style={styles.col1}><TextField label="Nombre" placeholder="Ej. Juan" defaultValue="Oldrin" /></View>
-                  <View style={styles.col1}><TextField label="Apellido" placeholder="Ej. Pérez" defaultValue="Pruebaquince" /></View>
-                  <View style={styles.col2}><TextField label="Identificación" placeholder="Documento de identidad" defaultValue="1029384756" /></View>
+                  <View style={styles.col1}>
+                    <TextField 
+                      label="Nombre" 
+                      value={user?.guest_first_name || ''} 
+                      editable={false} 
+                    />
+                  </View>
+                  <View style={styles.col1}>
+                    <TextField 
+                      label="Apellido" 
+                      value={user?.guest_last_name || ''} 
+                      editable={false} 
+                    />
+                  </View>
+                  <View style={styles.col2}>
+                    <TextField 
+                      label="Correo Electrónico" 
+                      value={user?.guest_email_address || ''} 
+                      editable={false} 
+                    />
+                  </View>
+                  <View style={styles.col1}>
+                    <TextField 
+                      label="Estado" 
+                      value={user?.guest_status === 1 ? 'Confirmado' : 'Pendiente'} 
+                      editable={false} 
+                    />
+                  </View>
+                  <View style={styles.col1}>
+                    <TextField 
+                      label="Fecha de registro" 
+                      value={user?.guest_creation_timestamp ? new Date(user.guest_creation_timestamp * 1000).toLocaleDateString() : ''} 
+                      editable={false} 
+                    />
+                  </View>
                 </View>
               </Card>
             </View>
 
-            {/* Canales de Contacto */}
-            <View style={[styles.outerCard, { backgroundColor: activeColors.surfaceContainerLow }]}>
-              <Card layer="lowest" style={styles.innerCard}>
-                <View style={styles.sectionHeader}>
-                  <View style={[styles.headerPill, { backgroundColor: activeColors.primary }]} />
-                  <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700' }}>Canales de Contacto</Typography>
-                </View>
-                <View style={styles.grid2Col}>
-                  <View style={styles.col2}><TextField label="Email" placeholder="correo@dominio.com" keyboardType="email-address" defaultValue="oldrin.prueba@ejemplo.com" /></View>
-                  <View style={styles.col1}><TextField label="Código de País" placeholder="+57" defaultValue="Colombia (+57)" /></View>
-                  <View style={styles.col1}><TextField label="Teléfono Celular" placeholder="Número móvil" keyboardType="phone-pad" defaultValue="3001234567" /></View>
-                  <View style={styles.col2}><TextField label="Teléfono Fijo" placeholder="Número local" keyboardType="phone-pad" defaultValue="6012345678" /></View>
-                </View>
-              </Card>
-            </View>
-
-            {/* Ubicación */}
-            <View style={[styles.outerCard, { backgroundColor: activeColors.surfaceContainerLow }]}>
-              <Card layer="lowest" style={styles.innerCard}>
-                <View style={styles.sectionHeader}>
-                  <View style={[styles.headerPill, { backgroundColor: activeColors.primary }]} />
-                  <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700' }}>Ubicación y Domicilio</Typography>
-                </View>
-                <View style={styles.grid2Col}>
-                  <View style={styles.col1}><TextField label="País" placeholder="Ej. Colombia" defaultValue="Colombia" /></View>
-                  <View style={styles.col1}><TextField label="Departamento/Estado" placeholder="Ej. Cundinamarca" defaultValue="Cundinamarca" /></View>
-                  <View style={styles.col2}><TextField label="Ciudad" placeholder="Ej. Bogotá" defaultValue="Bogotá" /></View>
-                  <View style={styles.col2}><TextField label="Direcciones" placeholder="Dirección completa..." multiline numberOfLines={3} defaultValue="Calle 100 # 15-20, Apto 502" /></View>
-                </View>
-              </Card>
-            </View>
-
-            {/* Preferencias */}
+            {/* Preferencias (Editable) */}
             <View style={[styles.outerCard, { backgroundColor: activeColors.surfaceContainerLow }]}>
               <Card layer="lowest" style={[styles.innerCard, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing[4] }]}>
                 <View style={{ flex: 1, gap: Spacing[1] }}>
-                  <Typography variant="headline" style={{ fontSize: 16, fontWeight: '700' }}>Notificar información adicional</Typography>
+                  <Typography variant="headline" style={{ fontSize: 16, fontWeight: '700' }}>Enviar información extra</Typography>
                   <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>
-                    Recibir alertas extendidas sobre el estado de los dispositivos vinculados.
+                    Habilita el envío de información adicional del paciente como medicamentos, dietas y cuidados especiales.
                   </Typography>
                 </View>
                 <Switch
@@ -123,13 +167,13 @@ export const EditUserScreen = () => {
             <View style={styles.actionArea}>
               <Pressable
                 style={({ pressed }) => [styles.updateBtn, pressed && { transform: [{ scale: 0.98 }] }]}
-                onPress={() => updateUser('1', {})}
+                onPress={handleUpdate}
                 disabled={isSaving}
               >
                 <LinearGradient colors={[activeColors.primary, activeColors.primaryDim]} style={styles.gradientBg} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                   <MaterialIcons name="save" size={24} color={activeColors.onPrimary} />
                   <Typography variant="headline" style={{ color: activeColors.onPrimary, fontWeight: '700', fontSize: 16 }}>
-                    {isSaving ? 'Guardando...' : 'Actualizar Usuario'}
+                    {isSaving ? 'Guardando...' : 'Guardar Cambios'}
                   </Typography>
                 </LinearGradient>
               </Pressable>
@@ -165,7 +209,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: Spacing[6],
     paddingBottom: Spacing[10],
-    maxWidth: 1024,
+    maxWidth: 600,
     width: '100%',
     alignSelf: 'center',
   },

@@ -8,18 +8,19 @@ export const useProfile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const fetchProfile = async () => {
+    setIsLoading(true);
+    try {
+      const data = await ProfileRepository.getProfile();
+      setProfile(data);
+    } catch (e) {
+      console.error('Error fetching profile:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchProfile = async () => {
-      setIsLoading(true);
-      try {
-        const data = await ProfileRepository.getProfile();
-        setProfile(data);
-      } catch (e) {
-        console.error('Error fetching profile:', e);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchProfile();
   }, []);
 
@@ -27,21 +28,21 @@ export const useProfile = () => {
     setIsSaving(true);
     try {
       await ProfileRepository.updateProfile(data);
-      router.back();
     } catch (e) {
       console.error('Error updating profile:', e);
+      throw e;
     } finally {
       setIsSaving(false);
     }
   };
 
-  const changePassword = async (current: string, newPassword: string) => {
+  const changePassword = async (data: any) => {
     setIsSaving(true);
     try {
-      await ProfileRepository.changePassword(current, newPassword);
-      router.back();
+      await ProfileRepository.changePassword(data);
     } catch (e) {
       console.error('Error changing password:', e);
+      throw e;
     } finally {
       setIsSaving(false);
     }
@@ -56,5 +57,19 @@ export const useProfile = () => {
     }
   };
 
-  return { profile, isLoading, isSaving, updateProfile, changePassword, logout };
+  const deleteAccount = async () => {
+    setIsSaving(true);
+    try {
+      await ProfileRepository.deleteAccount();
+      router.replace('/login');
+    } catch (e) {
+      console.error('Error deleting account:', e);
+      throw e;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return { profile, isLoading, isSaving, updateProfile, changePassword, logout, deleteAccount, fetchProfile };
 };
+

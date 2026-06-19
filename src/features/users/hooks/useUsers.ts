@@ -20,16 +20,36 @@ export const useUsers = () => {
     }
   }, []);
 
+  const loadCachedUsers = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await UsersRepository.getCachedUsers();
+      setUsers(data);
+    } catch (e) {
+      console.error('Error loading cached users:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchUsers();
+    UsersRepository.getCachedUsers().then(data => {
+      if (data && data.length > 0) {
+        setUsers(data);
+      } else {
+        fetchUsers();
+      }
+    });
   }, [fetchUsers]);
 
   const createUser = async (data: any) => {
     setIsSaving(true);
     try {
       await UsersRepository.createUser(data);
+      alert('Colaborador invitado exitosamente.');
       router.back();
-    } catch (e) {
+    } catch (e: any) {
+      alert(e.message || 'Error al registrar al colaborador.');
       console.error('Error creating user:', e);
     } finally {
       setIsSaving(false);
@@ -40,22 +60,26 @@ export const useUsers = () => {
     setIsSaving(true);
     try {
       await UsersRepository.updateUser(id, data);
+      alert('Colaborador actualizado exitosamente.');
       router.back();
-    } catch (e) {
+    } catch (e: any) {
+      alert(e.message || 'Error al actualizar al colaborador.');
       console.error('Error updating user:', e);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const deleteUser = async (id: string) => {
+  const deleteUser = async (email: string) => {
     try {
-      await UsersRepository.deleteUser(id);
+      await UsersRepository.deleteUser(email);
+      alert('Colaborador eliminado exitosamente.');
       router.back();
-    } catch (e) {
+    } catch (e: any) {
+      alert(e.message || 'Error al eliminar al colaborador.');
       console.error('Error deleting user:', e);
     }
   };
 
-  return { users, isLoading, isSaving, createUser, updateUser, deleteUser, refetch: fetchUsers };
+  return { users, isLoading, isSaving, createUser, updateUser, deleteUser, refetch: fetchUsers, loadCachedUsers };
 };

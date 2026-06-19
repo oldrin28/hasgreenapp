@@ -4,6 +4,8 @@ export const API_URL = 'https://ecs.hasgreen.org/api/v1.0';
 
 export class PatientsRepository {
   static async getPatients(): Promise<any[]> {
+    const action = 'Listar pacientes (/patients)';
+    const requestTime = new Date().toISOString();
     try {
       const token = await AsyncStorage.getItem('user_token');
       const response = await fetch(`${API_URL}/patients`, {
@@ -17,23 +19,27 @@ export class PatientsRepository {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Error al obtener la lista de pacientes.');
+        const errorMsg = errorData.message || 'Error al obtener la lista de pacientes.';
+        console.error(`[ERROR] Acción: ${action} - Resultado: ${errorMsg} - Fecha/Hora: ${requestTime}`);
+        throw new Error(errorMsg);
       }
 
       const patients = await response.json();
-      console.log('JSON de pacientes recibido:', JSON.stringify(patients, null, 2));
+      console.log(`[ÉXITO] Acción: ${action} - Resultado: Lista de pacientes obtenida exitosamente (${Array.isArray(patients) ? patients.length : 0} pacientes) - Fecha/Hora: ${requestTime}`);
       
       // Almacenarlos localmente
       await AsyncStorage.setItem('patients_list', JSON.stringify(patients));
       
       return patients;
-    } catch (error) {
-      console.error('Error en PatientsRepository.getPatients:', error);
+    } catch (error: any) {
+      console.error(`[ERROR] Acción: ${action} - Resultado: ${error.message || error} - Fecha/Hora: ${requestTime}`);
       throw error;
     }
   }
 
   static async getPatientById(id: string): Promise<any> {
+    const action = `Obtener detalle de paciente por ID (/patient?patient_id=${id})`;
+    const requestTime = new Date().toISOString();
     try {
       const token = await AsyncStorage.getItem('user_token');
       const response = await fetch(`${API_URL}/patient?patient_id=${id}`, {
@@ -47,17 +53,23 @@ export class PatientsRepository {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Error al obtener los datos del paciente.');
+        const errorMsg = errorData.message || 'Error al obtener los datos del paciente.';
+        console.error(`[ERROR] Acción: ${action} - Resultado: ${errorMsg} - Fecha/Hora: ${requestTime}`);
+        throw new Error(errorMsg);
       }
 
-      return await response.json();
-    } catch (error) {
-      console.error('Error en PatientsRepository.getPatientById:', error);
+      const patient = await response.json();
+      console.log(`[ÉXITO] Acción: ${action} - Resultado: Datos del paciente cargados exitosamente - Fecha/Hora: ${requestTime}`);
+      return patient;
+    } catch (error: any) {
+      console.error(`[ERROR] Acción: ${action} - Resultado: ${error.message || error} - Fecha/Hora: ${requestTime}`);
       throw error;
     }
   }
 
   static async createPatient(data: any): Promise<boolean> {
+    const action = 'Registrar paciente (/registerpatient)';
+    const requestTime = new Date().toISOString();
     try {
       const token = await AsyncStorage.getItem('user_token');
       const response = await fetch(`${API_URL}/registerpatient`, {
@@ -93,21 +105,28 @@ export class PatientsRepository {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Error al registrar el paciente.');
+        const errorMsg = errorData.message || 'Error al registrar el paciente.';
+        console.error(`[ERROR] Acción: ${action} - Resultado: ${errorMsg} - Fecha/Hora: ${requestTime}`);
+        throw new Error(errorMsg);
       }
 
       const res = await response.json();
       if (res.result === 'error') {
-        throw new Error(res.message || 'Error al registrar el paciente.');
+        const errorMsg = res.message || 'Error al registrar el paciente.';
+        console.error(`[ERROR] Acción: ${action} - Resultado: ${errorMsg} - Fecha/Hora: ${requestTime}`);
+        throw new Error(errorMsg);
       }
+      console.log(`[ÉXITO] Acción: ${action} - Resultado: ${res.message || 'Paciente registrado exitosamente'} - Fecha/Hora: ${requestTime}`);
       return res.result === 'success' || res.result === 'ok' || true;
-    } catch (error) {
-      console.error('Error en PatientsRepository.createPatient:', error);
+    } catch (error: any) {
+      console.error(`[ERROR] Acción: ${action} - Resultado: ${error.message || error} - Fecha/Hora: ${requestTime}`);
       throw error;
     }
   }
 
   static async updatePatient(id: string, data: any): Promise<boolean> {
+    const action = `Actualizar paciente (/updatepatient)`;
+    const requestTime = new Date().toISOString();
     try {
       const token = await AsyncStorage.getItem('user_token');
       const response = await fetch(`${API_URL}/updatepatient`, {
@@ -143,18 +162,28 @@ export class PatientsRepository {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Error al actualizar los datos del paciente.');
+        const errorMsg = errorData.message || 'Error al actualizar los datos del paciente.';
+        console.error(`[ERROR] Acción: ${action} - Resultado: ${errorMsg} - Fecha/Hora: ${requestTime}`);
+        throw new Error(errorMsg);
       }
 
       const res = await response.json();
+      if (res.result === 'error') {
+        const errorMsg = res.message || 'Error al actualizar el paciente.';
+        console.error(`[ERROR] Acción: ${action} - Resultado: ${errorMsg} - Fecha/Hora: ${requestTime}`);
+        throw new Error(errorMsg);
+      }
+      console.log(`[ÉXITO] Acción: ${action} - Resultado: ${res.message || 'Paciente actualizado exitosamente'} - Fecha/Hora: ${requestTime}`);
       return res.result === 'success' || res.result === 'ok' || true;
-    } catch (error) {
-      console.error('Error en PatientsRepository.updatePatient:', error);
+    } catch (error: any) {
+      console.error(`[ERROR] Acción: ${action} - Resultado: ${error.message || error} - Fecha/Hora: ${requestTime}`);
       throw error;
     }
   }
 
   static async deletePatient(id: string): Promise<boolean> {
+    const action = `Eliminar paciente (/deletepatient)`;
+    const requestTime = new Date().toISOString();
     try {
       const token = await AsyncStorage.getItem('user_token');
       const response = await fetch(`${API_URL}/deletepatient`, {
@@ -171,13 +200,21 @@ export class PatientsRepository {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Error al eliminar el paciente.');
+        const errorMsg = errorData.message || 'Error al eliminar el paciente.';
+        console.error(`[ERROR] Acción: ${action} - Resultado: ${errorMsg} - Fecha/Hora: ${requestTime}`);
+        throw new Error(errorMsg);
       }
 
       const res = await response.json();
+      if (res.result === 'error') {
+        const errorMsg = res.message || 'Error al eliminar el paciente.';
+        console.error(`[ERROR] Acción: ${action} - Resultado: ${errorMsg} - Fecha/Hora: ${requestTime}`);
+        throw new Error(errorMsg);
+      }
+      console.log(`[ÉXITO] Acción: ${action} - Resultado: ${res.message || 'Paciente eliminado exitosamente'} - Fecha/Hora: ${requestTime}`);
       return res.result === 'success' || res.result === 'ok' || true;
-    } catch (error) {
-      console.error('Error en PatientsRepository.deletePatient:', error);
+    } catch (error: any) {
+      console.error(`[ERROR] Acción: ${action} - Resultado: ${error.message || error} - Fecha/Hora: ${requestTime}`);
       throw error;
     }
   }

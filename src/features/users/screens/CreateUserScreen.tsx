@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View, ScrollView, useColorScheme, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, ScrollView, useColorScheme, Pressable, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
@@ -14,6 +14,24 @@ export const CreateUserScreen = () => {
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
   const { createUser, isSaving } = useUsers();
+
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [sendExtraInfo, setSendExtraInfo] = useState(false);
+
+  const handleSave = () => {
+    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
+      alert("Por favor, completa el nombre, apellido y correo electrónico.");
+      return;
+    }
+    createUser({
+      first_name: firstName,
+      last_name: lastName,
+      email: email,
+      send_extra_info: sendExtraInfo ? 1 : 0
+    });
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -39,55 +57,59 @@ export const CreateUserScreen = () => {
           <View style={styles.pageIntro}>
             <Typography variant="display" style={{ fontSize: 28, letterSpacing: -1 }}>Nuevo Registro</Typography>
             <Typography variant="body" color="onSurfaceVariant" style={{ marginTop: Spacing[2] }}>
-              Complete los campos detallados para dar de alta un nuevo usuario en el sistema HASGREEN.
+              Complete los campos esenciales para invitar a un nuevo colaborador a su red.
             </Typography>
           </View>
 
           <View style={styles.formContainer}>
 
-            {/* Información Personal */}
+            {/* Información del Colaborador */}
             <Card layer="lowest" style={styles.sectionCard}>
               <View style={[styles.statusPill, { backgroundColor: activeColors.primary }]} />
               <View style={styles.sectionHeader}>
-                <MaterialIcons name="badge" size={24} color={activeColors.primary} />
-                <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700' }}>Información Personal</Typography>
+                <MaterialIcons name="person" size={24} color={activeColors.primary} />
+                <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700' }}>Información del Colaborador</Typography>
               </View>
               <View style={styles.grid2Col}>
-                <View style={styles.col1}><TextField label="Nombre" placeholder="Ej. Juan Carlos" /></View>
-                <View style={styles.col1}><TextField label="Apellido" placeholder="Ej. Pérez Rodríguez" /></View>
-                <View style={styles.col2}><TextField label="Número de Identificación" placeholder="DNI, Pasaporte o Cédula" /></View>
-              </View>
-            </Card>
-
-            {/* Contacto */}
-            <Card layer="lowest" style={styles.sectionCard}>
-              <View style={[styles.statusPill, { backgroundColor: activeColors.primaryContainer }]} />
-              <View style={styles.sectionHeader}>
-                <MaterialIcons name="contact-mail" size={24} color={activeColors.primary} />
-                <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700' }}>Contacto</Typography>
-              </View>
-              <View style={styles.grid2Col}>
-                <View style={styles.col2}><TextField label="Correo Electrónico" placeholder="nombre@ejemplo.com" keyboardType="email-address" /></View>
-                <View style={[styles.col2, { flexDirection: 'row', gap: Spacing[4] }]}>
-                  <View style={{ flex: 1 }}><TextField label="Cód. País" placeholder="+57" /></View>
-                  <View style={{ flex: 2 }}><TextField label="Celular" placeholder="000 000 000" keyboardType="phone-pad" /></View>
+                <View style={styles.col1}>
+                  <TextField 
+                    label="Nombre" 
+                    placeholder="Ej. Juan Carlos" 
+                    value={firstName} 
+                    onChangeText={setFirstName} 
+                  />
                 </View>
-                <View style={styles.col2}><TextField label="Teléfono Fijo (Opcional)" placeholder="Número local" keyboardType="phone-pad" /></View>
-              </View>
-            </Card>
-
-            {/* Ubicación */}
-            <Card layer="lowest" style={styles.sectionCard}>
-              <View style={[styles.statusPill, { backgroundColor: activeColors.secondary }]} />
-              <View style={styles.sectionHeader}>
-                <MaterialIcons name="location-on" size={24} color={activeColors.primary} />
-                <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700' }}>Ubicación</Typography>
-              </View>
-              <View style={styles.grid2Col}>
-                <View style={styles.col1}><TextField label="País" placeholder="Colombia" /></View>
-                <View style={styles.col1}><TextField label="Departamento / Provincia" placeholder="Estado o Región" /></View>
-                <View style={styles.col2}><TextField label="Ciudad" placeholder="Nombre de la ciudad" /></View>
-                <View style={styles.col2}><TextField label="Direcciones" placeholder="Calle, número, piso, puerta..." multiline numberOfLines={3} /></View>
+                <View style={styles.col1}>
+                  <TextField 
+                    label="Apellido" 
+                    placeholder="Ej. Pérez Rodríguez" 
+                    value={lastName} 
+                    onChangeText={setLastName} 
+                  />
+                </View>
+                <View style={styles.col2}>
+                  <TextField 
+                    label="Correo Electrónico" 
+                    placeholder="nombre@ejemplo.com" 
+                    keyboardType="email-address" 
+                    value={email} 
+                    onChangeText={setEmail} 
+                  />
+                </View>
+                <View style={[styles.col2, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing[4] }]}>
+                  <View style={{ flex: 1, paddingRight: Spacing[4] }}>
+                    <Typography variant="body" style={{ fontWeight: '600' }}>Enviar información extra</Typography>
+                    <Typography variant="label" color="onSurfaceVariant" style={{ fontSize: 12 }}>
+                      Habilita el envío de información adicional del paciente como medicamentos, dietas y cuidados especiales.
+                    </Typography>
+                  </View>
+                  <Switch 
+                    value={sendExtraInfo} 
+                    onValueChange={setSendExtraInfo} 
+                    trackColor={{ false: activeColors.outlineVariant, true: activeColors.primary }}
+                    thumbColor={sendExtraInfo ? activeColors.onPrimary : activeColors.outline}
+                  />
+                </View>
               </View>
             </Card>
 
@@ -95,16 +117,16 @@ export const CreateUserScreen = () => {
             <View style={styles.submitArea}>
               <Pressable
                 style={({ pressed }) => [styles.submitBtn, { backgroundColor: activeColors.primary, shadowColor: activeColors.primary }, pressed && { transform: [{ scale: 0.98 }] }]}
-                onPress={() => createUser({})}
+                onPress={handleSave}
                 disabled={isSaving}
               >
                 <MaterialIcons name="person-add" size={24} color={activeColors.onPrimary} />
                 <Typography variant="headline" style={{ color: activeColors.onPrimary, fontWeight: '700', fontSize: 16 }}>
-                  {isSaving ? 'Registrando...' : 'Registrar Usuario'}
+                  {isSaving ? 'Registrando...' : 'Registrar Colaborador'}
                 </Typography>
               </Pressable>
               <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 12, textAlign: 'center', marginTop: Spacing[4] }}>
-                Al registrar, el usuario recibirá un correo de bienvenida automático.
+                Al registrar, el usuario recibirá una invitación por correo electrónico.
               </Typography>
             </View>
 
@@ -129,7 +151,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: Spacing[6],
     paddingBottom: Spacing[10],
-    maxWidth: 896,
+    maxWidth: 600,
     width: '100%',
     alignSelf: 'center',
   },

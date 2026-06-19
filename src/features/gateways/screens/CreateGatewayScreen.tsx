@@ -1,7 +1,7 @@
-import React from 'react';
-import { StyleSheet, View, ScrollView, useColorScheme, Pressable, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, ScrollView, useColorScheme, Pressable, KeyboardAvoidingView, Platform, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
 import { Card } from '@/components/ui/Card';
 import { TextField } from '@/components/ui/TextField';
@@ -12,9 +12,15 @@ import { useGateways } from '../hooks/useGateways';
 
 export function CreateGatewayScreen() {
   const router = useRouter();
+  const { type, uid } = useLocalSearchParams<{ type?: string; uid?: string }>();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
   const { createGateway, isLoading } = useGateways();
+
+  const [deviceType, setDeviceType] = useState(type || 'GTWY');
+  const [deviceUid, setDeviceUid] = useState(uid || '');
+  const [gatewayName, setGatewayName] = useState('');
+  const [gatewayLocation, setGatewayLocation] = useState('');
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -66,17 +72,39 @@ export function CreateGatewayScreen() {
               <View style={styles.grid2Col}>
                 <View style={styles.col1}>
                   <View style={{ position: 'relative' }}>
-                    <TextField label="Tipo de Dispositivo" defaultValue="GTWY" editable={false} />
+                    <TextField 
+                      label="Tipo de Dispositivo" 
+                      value={deviceType} 
+                      onChangeText={setDeviceType} 
+                      editable={false} 
+                    />
                     <View style={styles.lockIcon}>
                       <MaterialIcons name="lock" size={16} color={activeColors.outlineVariant} />
                     </View>
                   </View>
                 </View>
                 <View style={styles.col1}>
-                  <TextField label="Identificador Único (UID)" placeholder="00:1A:2B:3C:4D:5E" editable={!isLoading} />
+                  <View style={{ position: 'relative' }}>
+                    <TextField 
+                      label="Identificador Único (UID)" 
+                      placeholder="00:1A:2B:3C:4D:5E" 
+                      value={deviceUid} 
+                      onChangeText={setDeviceUid} 
+                      editable={false} 
+                    />
+                    <View style={styles.lockIcon}>
+                      <MaterialIcons name="lock" size={16} color={activeColors.outlineVariant} />
+                    </View>
+                  </View>
                 </View>
                 <View style={styles.col2}>
-                  <TextField label="Nombre del Gateway" placeholder="Ej: Concentrador Planta Norte A1" editable={!isLoading} />
+                  <TextField 
+                    label="Nombre del Gateway" 
+                    placeholder="Ej: Concentrador Planta Norte A1" 
+                    value={gatewayName} 
+                    onChangeText={setGatewayName} 
+                    editable={!isLoading} 
+                  />
                 </View>
               </View>
             </Card>
@@ -91,21 +119,14 @@ export function CreateGatewayScreen() {
               </View>
 
               <View style={styles.col2}>
-                <TextField label="Referencia de Ubicación" placeholder="Ej: Sala de Servidores, Rack 4" editable={!isLoading} />
-              </View>
-              
-              <Pressable style={[styles.mapContainer, { borderColor: activeColors.outlineVariant, backgroundColor: activeColors.surfaceContainer }]} disabled={isLoading}>
-                <Image 
-                  source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB4XnyhxJuv4Xc0NwBx-UepiLOUt6dXzsiyo2hr_xA06j0IFV7ry0luBjRR-sBsz2wQsKheg7LTRWHY_GvnUWbvx9LBfStrWqwgEBXwvxQGPLbYxGC_55HnwAvfGSCIP_Uf56Kid3KIrNBpAZz6_8JEkimtFUzeYQ8gYnR3ALMqCaPVS0pZtQ_Z_Fp9g76gSg5-ZaxHJMQl57RLgaaAHw4kz838ZjvIw8-A7yHIKGdnOPrCftqocjmvDYWYJue6B-yRdbdQsnFpSZ6z' }}
-                  style={[styles.mapImage, { opacity: 0.6 }]}
+                <TextField 
+                  label="Referencia de Ubicación" 
+                  placeholder="Ej: Sala de Servidores, Rack 4" 
+                  value={gatewayLocation} 
+                  onChangeText={setGatewayLocation} 
+                  editable={!isLoading} 
                 />
-                <View style={styles.mapOverlay}>
-                  <View style={[styles.glassPanel, { backgroundColor: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.2)' }]}>
-                    <MaterialIcons name="my-location" size={16} color={activeColors.primary} />
-                    <Typography variant="label" style={{ fontWeight: '700', fontSize: 12, color: '#2c2f30' }}>Seleccionar en el mapa</Typography>
-                  </View>
-                </View>
-              </Pressable>
+              </View>
             </Card>
 
             {/* Submit Button Area */}
@@ -114,7 +135,22 @@ export function CreateGatewayScreen() {
                 variant="primary"
                 label={isLoading ? "Guardando..." : "Guardar Gateway"}
                 leftIcon="save"
-                onPress={() => createGateway({})}
+                onPress={() => {
+                  if (!gatewayName.trim()) {
+                    Alert.alert('Campo Obligatorio', 'El nombre del gateway es obligatorio.');
+                    return;
+                  }
+                  if (!gatewayLocation.trim()) {
+                    Alert.alert('Campo Obligatorio', 'La referencia de ubicación es obligatoria.');
+                    return;
+                  }
+                  createGateway({
+                    gateway_type: deviceType,
+                    gateway_unique_id: deviceType + deviceUid,
+                    gateway_name: gatewayName,
+                    gateway_location: gatewayLocation
+                  });
+                }}
                 disabled={isLoading}
               />
             </View>

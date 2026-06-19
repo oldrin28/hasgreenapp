@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, useColorScheme, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, ScrollView, useColorScheme, Pressable, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
@@ -13,10 +13,66 @@ export const ChangePasswordScreen = () => {
   const router = useRouter();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
-  const { changePassword, isSaving } = useProfile();
+  const { profile, changePassword, isSaving, fetchProfile } = useProfile();
 
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  useEffect(() => {
+    if (password && confirmPassword && password !== confirmPassword) {
+      setErrorMsg('Las contraseñas no coinciden');
+    } else {
+      setErrorMsg('');
+    }
+  }, [password, confirmPassword]);
+
+  const handleChangePassword = async () => {
+    if (!password) {
+      Alert.alert('Error', 'Por favor, ingrese la nueva contraseña.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Las contraseñas no coinciden.');
+      return;
+    }
+    if (password.length < 8) {
+      Alert.alert('Error', 'La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+
+    try {
+      await changePassword({
+        first_name: profile?.first_name || '',
+        last_name: profile?.last_name || '',
+        email_address: profile?.email_address || '',
+        mobile_phone_country_code: profile?.mobile_phone_country_code || '',
+        mobile_phone_number: profile?.mobile_phone_number || '',
+        fixed_phone_country_code: profile?.fixed_phone_country_code || '',
+        fixed_phone_number: profile?.fixed_phone_number || '',
+        country: profile?.country || '',
+        state: profile?.state || '',
+        city: profile?.city || '',
+        address1: profile?.address1 || '',
+        address2: profile?.address2 || '',
+        address3: profile?.address3 || '',
+        test_mode: profile?.test_mode !== undefined ? (profile.test_mode === '1' || profile.test_mode === 1 ? 1 : 0) : 0,
+        password1: password
+      });
+      Alert.alert('Éxito', 'La contraseña se ha actualizado correctamente.', [
+        { text: 'Aceptar', onPress: () => router.back() }
+      ]);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'No se pudo actualizar la contraseña.');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -59,7 +115,12 @@ export const ChangePasswordScreen = () => {
               <View style={styles.fieldGroup}>
                 <Typography variant="label" color="onSurfaceVariant" style={styles.fieldLabel}>Nueva contraseña</Typography>
                 <View style={styles.inputWithIcon}>
-                  <TextField placeholder="••••••••" secureTextEntry={!showNew} />
+                  <TextField 
+                    placeholder="••••••••" 
+                    secureTextEntry={!showNew} 
+                    value={password}
+                    onChangeText={setPassword}
+                  />
                   <Pressable style={styles.iconRight} onPress={() => setShowNew(!showNew)}>
                     <MaterialIcons name={showNew ? 'visibility-off' : 'visibility'} size={20} color={activeColors.outline} />
                   </Pressable>
@@ -70,7 +131,13 @@ export const ChangePasswordScreen = () => {
               <View style={styles.fieldGroup}>
                 <Typography variant="label" color="onSurfaceVariant" style={styles.fieldLabel}>Confirmar contraseña</Typography>
                 <View style={styles.inputWithIcon}>
-                  <TextField placeholder="••••••••" secureTextEntry={!showConfirm} />
+                  <TextField 
+                    placeholder="••••••••" 
+                    secureTextEntry={!showConfirm} 
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    error={errorMsg || undefined}
+                  />
                   <Pressable style={styles.iconRight} onPress={() => setShowConfirm(!showConfirm)}>
                     <MaterialIcons name={showConfirm ? 'visibility-off' : 'visibility'} size={20} color={activeColors.outline} />
                   </Pressable>
@@ -94,7 +161,7 @@ export const ChangePasswordScreen = () => {
               <View style={styles.actionArea}>
                 <Pressable
                   style={({ pressed }) => [styles.updateBtn, pressed && { transform: [{ scale: 0.98 }] }]}
-                  onPress={() => changePassword('', '')}
+                  onPress={handleChangePassword}
                   disabled={isSaving}
                 >
                   <LinearGradient colors={[activeColors.primary, activeColors.primaryDim]} style={styles.gradientBg} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>

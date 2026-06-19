@@ -117,7 +117,19 @@ export function EditPatientScreen() {
           setLastName(data.last_name || '');
           setPatientIdStr(data.patient_id || '');
           setGender(data.gender || '');
-          setBirthDate(data.birth_date || '');
+          
+          let formattedBirthDate = data.birth_date || '';
+          if (formattedBirthDate) {
+            const d = new Date(formattedBirthDate);
+            if (!isNaN(d.getTime())) {
+              const day = String(d.getUTCDate()).padStart(2, '0');
+              const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+              const year = d.getUTCFullYear();
+              formattedBirthDate = `${day}/${month}/${year}`;
+            }
+          }
+          setBirthDate(formattedBirthDate);
+
           setBloodType(data.blood_type || '');
           setEmailAddress(data.email_address || '');
           setMobilePhoneCountryCode(data.mobile_phone_country_code || '');
@@ -142,17 +154,23 @@ export function EditPatientScreen() {
       const year = selectedDate.getFullYear();
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
-      setBirthDate(`${year}-${month}-${day}`);
+      setBirthDate(`${day}/${month}/${year}`);
     }
+  };
+
+  const parseDate = (dateStr: string): Date => {
+    if (!dateStr) return new Date();
+    if (dateStr.includes('/')) {
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+      }
+    }
+    return new Date(dateStr);
   };
 
   const formatDateDisplay = (dateStr: string) => {
     if (!dateStr) return 'Seleccionar Fecha';
-    const onlyDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
-    const parts = onlyDate.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parts[0]}`;
-    }
     return dateStr;
   };
 
@@ -176,12 +194,20 @@ export function EditPatientScreen() {
       return;
     }
 
+    let apiBirthDate = birthDate;
+    if (birthDate && birthDate.includes('/')) {
+      const parts = birthDate.split('/');
+      if (parts.length === 3) {
+        apiBirthDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+    }
+
     updatePatient(id || '1', {
       first_name: firstName,
       last_name: lastName,
       patient_id: patientIdStr,
       gender,
-      birth_date: birthDate,
+      birth_date: apiBirthDate,
       blood_type: bloodType,
       email_address: emailAddress,
       mobile_phone_country_code: mobilePhoneCountryCode,
@@ -768,7 +794,7 @@ export function EditPatientScreen() {
       {/* DATE PICKER */}
       {showDatePicker && (
         <DateTimePicker
-          value={birthDate ? new Date(birthDate) : new Date()}
+          value={parseDate(birthDate)}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           minimumDate={new Date(1900, 0, 1)}

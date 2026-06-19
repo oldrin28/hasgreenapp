@@ -1,22 +1,40 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, useColorScheme, Pressable, TextInput } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, View, ScrollView, useColorScheme, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
 import { Spacing, Colors, Rounded } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useDevices } from '../../devices/hooks/useDevices';
+import { DEVICE_TYPES } from '../../devices/screens/DevicesListScreen';
 
 export const ConfigNotificationsStep1Screen = () => {
   const router = useRouter();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
-  const [selectedDevice, setSelectedDevice] = useState<string>('device1');
+  const { loadCachedDevices, loadCachedDeviceTypes, devices, deviceTypes, isLoading } = useDevices();
+  const [selectedDevice, setSelectedDevice] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const devices = [
-    { id: 'device1', name: 'Bollo limpio (8319300)', description: 'Sensor de Humedad - Invernadero A' },
-    { id: 'device2', name: 'Botón de mi casa (5630532)', description: 'Actuador Smart - Entrada Principal' },
-    { id: 'device3', name: 'Válvula Riego Norte (9201844)', description: 'Control de Flujo - Sector 3' },
-  ];
+  useFocusEffect(
+    useCallback(() => {
+      loadCachedDevices();
+      loadCachedDeviceTypes();
+    }, [])
+  );
+
+  const alarmTypes = ['ALRM01', 'DISP01', 'ALRM', 'DISP'];
+  const filteredDevices = devices.filter((device: any) => {
+    const isAlarm = alarmTypes.includes(device.device_type);
+    const matchesSearch = !searchQuery || String(device.device_name || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return !isAlarm && matchesSearch;
+  });
+
+  useEffect(() => {
+    if (!selectedDevice && filteredDevices.length > 0) {
+      setSelectedDevice(String(filteredDevices[0].id || filteredDevices[0].device_unique_id));
+    }
+  }, [filteredDevices, selectedDevice]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: activeColors.background }]} edges={['top', 'bottom']}>
@@ -76,38 +94,58 @@ export const ConfigNotificationsStep1Screen = () => {
             style={[styles.searchInput, { color: activeColors.onSurface }]}
             placeholder="Buscar dispositivo..."
             placeholderTextColor={activeColors.outlineVariant}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
         </View>
 
         {/* Device List */}
         <View style={styles.deviceList}>
-          {devices.map((device) => (
-            <Pressable
-              key={device.id}
-              style={[
-                styles.deviceCard,
-                { backgroundColor: activeColors.surfaceContainerLowest, borderColor: selectedDevice === device.id ? activeColors.primary : 'rgba(171, 173, 174, 0.15)' },
-                selectedDevice === device.id && { backgroundColor: 'rgba(8, 107, 0, 0.05)' }
-              ]}
-              onPress={() => setSelectedDevice(device.id)}
-            >
-              <View style={[styles.devicePill, { backgroundColor: selectedDevice === device.id ? activeColors.primary : 'rgba(171, 173, 174, 0.3)' }]} />
-              <View style={{ flex: 1 }}>
-                <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700', letterSpacing: -0.5 }}>{device.name}</Typography>
-                <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>{device.description}</Typography>
-              </View>
-              <View style={[styles.radioCircle, { borderColor: selectedDevice === device.id ? activeColors.primary : 'rgba(171, 173, 174, 0.3)' }, selectedDevice === device.id && { backgroundColor: activeColors.primary }]}>
-                {selectedDevice === device.id && <MaterialIcons name="check" size={16} color={activeColors.onPrimary} />}
-              </View>
-            </Pressable>
-          ))}
+          {isLoading && filteredDevices.length === 0 ? (
+            <ActivityIndicator size="large" color={activeColors.primary} style={{ marginTop: Spacing[6] }} />
+          ) : (
+            filteredDevices.map((device: any) => {
+              const devType = device.device_type || '';
+              const dynamicType = deviceTypes.find(
+                (t: any) => t.device_type_code === devType || t.code === devType
+              );
+              const typeLabel = dynamicType?.device_type_name || dynamicType?.name || dynamicType?.label || DEVICE_TYPES[devType]?.label || devType || 'Dispositivo IoT';
+              const deviceIdStr = String(device.id || device.device_unique_id);
+
+              return (
+                <Pressable
+                  key={deviceIdStr}
+                  style={[
+                    styles.deviceCard,
+                    { backgroundColor: activeColors.surfaceContainerLowest, borderColor: selectedDevice === deviceIdStr ? activeColors.primary : 'rgba(171, 173, 174, 0.15)' },
+                    selectedDevice === deviceIdStr && { backgroundColor: 'rgba(8, 107, 0, 0.05)' }
+                  ]}
+                  onPress={() => setSelectedDevice(deviceIdStr)}
+                >
+                  <View style={[styles.devicePill, { backgroundColor: selectedDevice === deviceIdStr ? activeColors.primary : 'rgba(171, 173, 174, 0.3)' }]} />
+                  <View style={{ flex: 1 }}>
+                    <Typography variant="headline" style={{ fontSize: 18, fontWeight: '700', letterSpacing: -0.5 }}>
+                      {device.device_name || 'Sin Nombre'}
+                    </Typography>
+                    <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>
+                      {typeLabel}
+                    </Typography>
+                  </View>
+                  <View style={[styles.radioCircle, { borderColor: selectedDevice === deviceIdStr ? activeColors.primary : 'rgba(171, 173, 174, 0.3)' }, selectedDevice === deviceIdStr && { backgroundColor: activeColors.primary }]}>
+                    {selectedDevice === deviceIdStr && <MaterialIcons name="check" size={16} color={activeColors.onPrimary} />}
+                  </View>
+                </Pressable>
+              );
+            })
+          )}
         </View>
 
         {/* Action */}
         <View style={styles.actionBar}>
           <Pressable
             style={({ pressed }) => [styles.nextBtn, { backgroundColor: activeColors.primary }, pressed && { transform: [{ scale: 0.95 }] }]}
-            onPress={() => router.push('/config-notificaciones-2')}
+            onPress={() => router.push({ pathname: '/config-notificaciones-2', params: { deviceId: selectedDevice } } as any)}
+            disabled={!selectedDevice}
           >
             <Typography variant="headline" style={{ color: activeColors.onPrimary, fontWeight: '700', fontSize: 16 }}>Siguiente Paso</Typography>
             <MaterialIcons name="arrow-forward" size={24} color={activeColors.onPrimary} />

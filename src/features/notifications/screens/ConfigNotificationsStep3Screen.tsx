@@ -1,22 +1,83 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { StyleSheet, View, ScrollView, useColorScheme, Pressable, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Typography } from '@/components/ui/Typography';
 import { Spacing, Colors, Rounded } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNotifications } from '../hooks/useNotifications';
+import { useDevices } from '../../devices/hooks/useDevices';
+import { useUsers } from '../../users/hooks/useUsers';
+import { DEVICE_TYPES } from '../../devices/screens/DevicesListScreen';
 
 export const ConfigNotificationsStep3Screen = () => {
   const router = useRouter();
+  const { deviceId, userId } = useLocalSearchParams<{ deviceId: string; userId: string }>();
   const theme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const activeColors = Colors[theme];
-  const { saveNotificationConfig, isSaving } = useNotifications();
+  const { saveNotificationConfig, isSaving, loadNotificationConfig } = useNotifications();
+  const { loadCachedDevices, loadCachedDeviceTypes, devices, deviceTypes } = useDevices();
+  const { users, loadCachedUsers } = useUsers();
 
   const [channels, setChannels] = useState({ sms: false, push: true, call: false, email: true, whatsapp: false });
   const [additionalInfo, setAdditionalInfo] = useState(false);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadCachedDevices();
+      loadCachedDeviceTypes();
+      loadCachedUsers();
+
+      if (deviceId && userId) {
+        loadNotificationConfig(deviceId, userId).then((userConfig) => {
+          if (userConfig) {
+            const notificationsStr = userConfig.notifications;
+            if (notificationsStr && notificationsStr.length === 5) {
+              setChannels({
+                sms: notificationsStr[0] === '1',
+                push: notificationsStr[1] === '1',
+                call: notificationsStr[2] === '1',
+                email: notificationsStr[3] === '1',
+                whatsapp: notificationsStr[4] === '1',
+              });
+            }
+            const extraInfoVal = userConfig.extra_info;
+            setAdditionalInfo(
+              extraInfoVal === '1' || 
+              extraInfoVal === 'true' || 
+              extraInfoVal === true || 
+              Number(extraInfoVal) === 1
+            );
+          }
+        });
+      }
+    }, [])
+  );
+
   const toggleChannel = (key: keyof typeof channels) => setChannels(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // Find selected device
+  const selectedDevice = devices.find(
+    (d: any) => String(d.id || d.device_unique_id) === String(deviceId)
+  );
+
+  // Find selected guest user
+  const selectedGuestUser = users.find(
+    (u: any) => String(u.guest_account_id) === String(userId)
+  );
+
+  const devType = selectedDevice?.device_type || '';
+  const dynamicType = deviceTypes.find(
+    (t: any) => t.device_type_code === devType || t.code === devType
+  );
+  
+  const iconName = DEVICE_TYPES[devType]?.icon || dynamicType?.icon || 'watch';
+  const typeLabel = dynamicType?.device_type_name || dynamicType?.name || dynamicType?.label || DEVICE_TYPES[devType]?.label || devType || 'Botón de pánico';
+
+  const deviceName = selectedDevice?.device_name || 'Cargando...';
+  const userName = selectedGuestUser
+    ? `${selectedGuestUser.guest_first_name || ''} ${selectedGuestUser.guest_last_name || ''}`.trim()
+    : 'Cargando...';
 
   const channelList = [
     { key: 'sms' as const, icon: 'sms', label: 'Mensaje de texto (SMS)' },
@@ -65,11 +126,11 @@ export const ConfigNotificationsStep3Screen = () => {
               </Typography>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing[4], marginTop: Spacing[2] }}>
                 <View style={[styles.summaryIconBox, { backgroundColor: activeColors.surfaceContainerLow }]}>
-                  <MaterialIcons name="router" size={24} color={activeColors.primary} />
+                  <MaterialIcons name={iconName as any} size={24} color={activeColors.primary} />
                 </View>
-                <View>
-                  <Typography variant="headline" style={{ fontSize: 16, fontWeight: '700' }}>Sensor de Humedad GH-204</Typography>
-                  <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>ID: 9942-AX-01</Typography>
+                <View style={{ flex: 1 }}>
+                  <Typography variant="headline" style={{ fontSize: 16, fontWeight: '700' }}>{deviceName}</Typography>
+                  <Typography variant="body" color="onSurfaceVariant" style={{ fontSize: 14 }}>{typeLabel}</Typography>
                 </View>
               </View>
             </View>
@@ -80,7 +141,7 @@ export const ConfigNotificationsStep3Screen = () => {
                 <View style={[styles.userIconBox, { backgroundColor: activeColors.surfaceContainerHigh }]}>
                   <MaterialIcons name="person" size={16} color={activeColors.onSurface} />
                 </View>
-                <Typography variant="headline" style={{ fontSize: 16, fontWeight: '600' }}>Ing. Carlos Mendoza</Typography>
+                <Typography variant="headline" style={{ fontSize: 16, fontWeight: '600' }}>{userName}</Typography>
               </View>
             </View>
           </View>
@@ -122,7 +183,31 @@ export const ConfigNotificationsStep3Screen = () => {
         <View style={styles.actionArea}>
           <Pressable
             style={({ pressed }) => [styles.saveBtn, { backgroundColor: activeColors.primary }, pressed && { transform: [{ scale: 0.98 }] }]}
-            onPress={() => { saveNotificationConfig('device1', channels); router.push('/notificaciones'); }}
+            onPress={async () => {
+              try {
+                const devIdNum = Number(deviceId || 0);
+                const guestAccIdNum = Number(userId || 0);
+                const extraInfoVal = additionalInfo ? 1 : 0;
+                
+                const notifString = [
+                  channels.sms ? '1' : '0',
+                  channels.push ? '1' : '0',
+                  channels.call ? '1' : '0',
+                  channels.email ? '1' : '0',
+                  channels.whatsapp ? '1' : '0',
+                ].join('');
+
+                await saveNotificationConfig({
+                  device_id: devIdNum,
+                  extra_info: extraInfoVal,
+                  guest_account_id: guestAccIdNum,
+                  notifications: notifString,
+                });
+                router.push('/notificaciones');
+              } catch (e) {
+                // Error handled in hook
+              }
+            }}
             disabled={isSaving}
           >
             <Typography variant="headline" style={{ color: activeColors.onPrimary, fontWeight: '700', fontSize: 18 }}>
